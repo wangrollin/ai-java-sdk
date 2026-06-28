@@ -46,6 +46,43 @@ As the project evolves, it is expected to grow toward:
 
 This project is at an early stage. The README describes the intended direction and value of the SDK; implementation details and public APIs will evolve as the core modules are built.
 
+## Requirements
+
+- JDK 25
+- Maven 3.9+
+
+## Minimal Usage
+
+The first implementation milestone supports synchronous OpenAI-compatible chat completions.
+
+```java
+import io.wangrolliin.ai.AiClient;
+import io.wangrolliin.ai.ChatMessage;
+import io.wangrolliin.ai.ChatRequest;
+import io.wangrolliin.ai.ChatResponse;
+
+import java.time.Duration;
+
+AiClient client = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl("https://api.openai.com/v1")
+    .defaultModel("gpt-4.1-mini")
+    .timeout(Duration.ofSeconds(30))
+    .build();
+
+ChatResponse response = client.chat(ChatRequest.builder()
+    .message(ChatMessage.user("Hello"))
+    .build());
+
+System.out.println(response.text());
+```
+
+Run the test suite with:
+
+```shell
+mvn test
+```
+
 ## License
 
 This project is licensed under the Apache License 2.0.
