@@ -62,6 +62,7 @@ import io.wangrolliin.ai.ChatMessage;
 import io.wangrolliin.ai.ChatRequest;
 import io.wangrolliin.ai.ChatResponse;
 import io.wangrolliin.ai.ChatStream;
+import io.wangrolliin.ai.RetryPolicy;
 
 import java.time.Duration;
 
@@ -70,6 +71,7 @@ AiClient client = AiClient.builder()
     .baseUrl("https://api.openai.com/v1")
     .defaultModel("gpt-4.1-mini")
     .timeout(Duration.ofSeconds(30))
+    .retryPolicy(RetryPolicy.defaultPolicy())
     .build();
 
 ChatResponse response = client.chat(ChatRequest.builder()
@@ -90,6 +92,22 @@ try (ChatStream stream = client.stream(ChatRequest.builder()
     }
 }
 ```
+
+Retries are disabled by default. Use `RetryPolicy.defaultPolicy()` to retry transient `429`, `500`, `502`, `503`, and `504` responses up to three total attempts, or build a custom policy:
+
+```java
+AiClient client = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .retryPolicy(RetryPolicy.builder()
+        .maxAttempts(3)
+        .initialDelay(Duration.ofMillis(200))
+        .maxDelay(Duration.ofSeconds(2))
+        .build())
+    .build();
+```
+
+Streaming requests only retry failures that happen before a successful response stream is returned. Once stream consumption begins, malformed events or read failures are surfaced to the caller without replaying the request.
 
 Run the test suite with:
 

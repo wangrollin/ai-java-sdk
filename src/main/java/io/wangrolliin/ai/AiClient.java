@@ -27,6 +27,7 @@ public final class AiClient {
     private final URI baseUri;
     private final String defaultModel;
     private final Duration timeout;
+    private final RetryPolicy retryPolicy;
     private final HttpClient httpClient;
 
     private AiClient(Builder builder) {
@@ -37,6 +38,7 @@ public final class AiClient {
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
+        this.retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
         this.httpClient = builder.httpClient == null
                 ? HttpClient.newBuilder().connectTimeout(this.timeout).build()
                 : builder.httpClient;
@@ -56,7 +58,10 @@ public final class AiClient {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        HttpResponse<String> response = send(httpRequest);
+        HttpResponse<String> response = sendWithRetry(
+                httpRequest,
+                HttpResponse.BodyHandlers.ofString(),
+                "chat request");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new AiException("Chat request failed with HTTP status "
                     + response.statusCode() + ": " + summarize(response.body()));
@@ -75,7 +80,10 @@ public final class AiClient {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        HttpResponse<InputStream> response = sendStream(httpRequest);
+        HttpResponse<InputStream> response = sendWithRetry(
+                httpRequest,
+                HttpResponse.BodyHandlers.ofInputStream(),
+                "streaming chat request");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             throw new AiException("Streaming chat request failed with HTTP status "
                     + response.statusCode() + ": " + summarize(readBody(response.body())));
@@ -109,26 +117,59 @@ public final class AiClient {
         }
     }
 
-    private HttpResponse<String> send(HttpRequest request) {
-        try {
-            return httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-        } catch (IOException e) {
-            throw new AiException("Failed to send chat request", e);
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AiException("Chat request was interrupted", e);
+    private <T> HttpResponse<T> sendWithRetry(
+            HttpRequest request,
+            HttpResponse.BodyHandler<T> bodyHandler,
+            String requestDescription) {
+        for (int attempt = 1; attempt <= retryPolicy.maxAttempts(); attempt++) {
+            sleepBeforeRetry(attempt, requestDescription);
+            try {
+                HttpResponse<T> response = httpClient.send(request, bodyHandler);
+                if (!shouldRetryResponse(response.statusCode(), attempt)) {
+                    return response;
+                }
+                closeRetriedBody(response.body());
+            } catch (IOException e) {
+                if (attempt == retryPolicy.maxAttempts()) {
+                    throw new AiException("Failed to send " + requestDescription, e);
+                }
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new AiException(capitalize(requestDescription) + " was interrupted", e);
+            }
+        }
+        throw new AiException("Failed to send " + requestDescription);
+    }
+
+    private static void closeRetriedBody(Object body) {
+        if (body instanceof InputStream inputStream) {
+            try {
+                inputStream.close();
+            } catch (IOException e) {
+                throw new AiException("Failed to close retry response body", e);
+            }
         }
     }
 
-    private HttpResponse<InputStream> sendStream(HttpRequest request) {
+    private boolean shouldRetryResponse(int statusCode, int attempt) {
+        return attempt < retryPolicy.maxAttempts() && retryPolicy.shouldRetryStatus(statusCode);
+    }
+
+    private void sleepBeforeRetry(int attempt, String requestDescription) {
+        Duration delay = retryPolicy.delayForAttempt(attempt);
+        if (delay.isZero()) {
+            return;
+        }
         try {
-            return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
-        } catch (IOException e) {
-            throw new AiException("Failed to send streaming chat request", e);
+            Thread.sleep(delay.toMillis());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
-            throw new AiException("Streaming chat request was interrupted", e);
+            throw new AiException(capitalize(requestDescription) + " was interrupted", e);
         }
+    }
+
+    private static String capitalize(String value) {
+        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private ChatResponse parseChatResponse(String body) {
@@ -184,6 +225,7 @@ public final class AiClient {
         private String baseUrl;
         private String defaultModel;
         private Duration timeout;
+        private RetryPolicy retryPolicy;
         private HttpClient httpClient;
 
         private Builder() {
@@ -206,6 +248,11 @@ public final class AiClient {
 
         public Builder timeout(Duration timeout) {
             this.timeout = timeout;
+            return this;
+        }
+
+        public Builder retryPolicy(RetryPolicy retryPolicy) {
+            this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy must not be null");
             return this;
         }
 

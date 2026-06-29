@@ -15,6 +15,8 @@ import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -139,6 +141,110 @@ class AiClientTest {
     }
 
     @Test
+    void doesNotRetryByDefault() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            attempts.incrementAndGet();
+            respond(exchange, 429, """
+                    {"error":{"message":"rate limited"}}
+                    """);
+        });
+
+        AiException exception = assertThrows(AiException.class, () -> testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build()));
+
+        assertEquals(1, attempts.get());
+        assertTrue(exception.getMessage().contains("HTTP status 429"));
+    }
+
+    @Test
+    void retriesRetryableChatStatusUntilSuccess() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            int attempt = attempts.incrementAndGet();
+            if (attempt == 1) {
+                respond(exchange, 429, """
+                        {"error":{"message":"rate limited"}}
+                        """);
+                return;
+            }
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok after retry"}}]}
+                    """);
+        });
+
+        ChatResponse response = retryingTestClient(2).chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build());
+
+        assertEquals("ok after retry", response.text());
+        assertEquals(2, attempts.get());
+    }
+
+    @Test
+    void retriesMultipleServerErrorsUntilSuccess() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            int attempt = attempts.incrementAndGet();
+            if (attempt < 3) {
+                respond(exchange, 500, """
+                        {"error":{"message":"temporary server error"}}
+                        """);
+                return;
+            }
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok after server retry"}}]}
+                    """);
+        });
+
+        ChatResponse response = retryingTestClient(3).chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build());
+
+        assertEquals("ok after server retry", response.text());
+        assertEquals(3, attempts.get());
+    }
+
+    @Test
+    void doesNotRetryNonRetryableChatStatus() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            attempts.incrementAndGet();
+            respond(exchange, 400, """
+                    {"error":{"message":"bad request"}}
+                    """);
+        });
+
+        AiException exception = assertThrows(AiException.class, () -> retryingTestClient(3).chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build()));
+
+        assertEquals(1, attempts.get());
+        assertTrue(exception.getMessage().contains("HTTP status 400"));
+        assertTrue(exception.getMessage().contains("bad request"));
+    }
+
+    @Test
+    void throwsFinalChatErrorAfterRetryExhaustion() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            attempts.incrementAndGet();
+            respond(exchange, 503, """
+                    {"error":{"message":"still unavailable"}}
+                    """);
+        });
+
+        AiException exception = assertThrows(AiException.class, () -> retryingTestClient(2).chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build()));
+
+        assertEquals(2, attempts.get());
+        assertTrue(exception.getMessage().contains("HTTP status 503"));
+        assertTrue(exception.getMessage().contains("still unavailable"));
+    }
+
+    @Test
     void throwsAiExceptionWhenResponseShapeIsInvalid() throws Exception {
         startServer(exchange -> respond(exchange, 200, """
                 {"choices":[]}
@@ -230,6 +336,38 @@ class AiClientTest {
     }
 
     @Test
+    void retriesRetryableStreamingStatusUntilSuccess() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            int attempt = attempts.incrementAndGet();
+            if (attempt == 1) {
+                respond(exchange, 503, """
+                        {"error":{"message":"stream unavailable"}}
+                        """);
+                return;
+            }
+            respondStream(exchange, """
+                    data: {"choices":[{"delta":{"content":"ok"},"finish_reason":null}]}
+
+                    data: [DONE]
+
+                    """);
+        });
+
+        List<ChatDelta> deltas = new ArrayList<>();
+        try (ChatStream stream = retryingTestClient(2).stream(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build())) {
+            for (ChatDelta delta : stream) {
+                deltas.add(delta);
+            }
+        }
+
+        assertEquals(List.of(new ChatDelta("ok", null)), deltas);
+        assertEquals(2, attempts.get());
+    }
+
+    @Test
     void throwsAiExceptionForMalformedStreamEvents() throws Exception {
         startServer(exchange -> respondStream(exchange, """
                 data: {"choices":[
@@ -243,6 +381,49 @@ class AiClientTest {
 
             assertTrue(exception.getMessage().contains("Failed to parse chat stream event"));
         }
+    }
+
+    @Test
+    void doesNotRetryAfterStreamConsumptionStarts() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            attempts.incrementAndGet();
+            respondStream(exchange, """
+                    data: {"choices":[
+
+                    """);
+        });
+
+        try (ChatStream stream = retryingTestClient(3).stream(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build())) {
+            AiException exception = assertThrows(AiException.class, () -> stream.iterator().hasNext());
+
+            assertTrue(exception.getMessage().contains("Failed to parse chat stream event"));
+        }
+        assertEquals(1, attempts.get());
+    }
+
+    @Test
+    void validatesRetryPolicy() {
+        IllegalArgumentException maxAttempts = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
+                .maxAttempts(0)
+                .build());
+        IllegalArgumentException initialDelay = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
+                .initialDelay(Duration.ofMillis(-1))
+                .build());
+        IllegalArgumentException maxDelay = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
+                .maxDelay(Duration.ofMillis(-1))
+                .build());
+        IllegalArgumentException delayOrder = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
+                .initialDelay(Duration.ofSeconds(2))
+                .maxDelay(Duration.ofSeconds(1))
+                .build());
+
+        assertEquals("maxAttempts must be positive", maxAttempts.getMessage());
+        assertEquals("initialDelay must not be negative", initialDelay.getMessage());
+        assertEquals("maxDelay must not be negative", maxDelay.getMessage());
+        assertEquals("initialDelay must not be greater than maxDelay", delayOrder.getMessage());
     }
 
     @Test
@@ -264,6 +445,21 @@ class AiClientTest {
                 .baseUrl("http://localhost:" + server.getAddress().getPort())
                 .defaultModel("test-model")
                 .timeout(Duration.ofSeconds(5))
+                .build();
+    }
+
+    private AiClient retryingTestClient(int maxAttempts) {
+        return AiClient.builder()
+                .apiKey("test-key")
+                .baseUrl("http://localhost:" + server.getAddress().getPort())
+                .defaultModel("test-model")
+                .timeout(Duration.ofSeconds(5))
+                .retryPolicy(RetryPolicy.builder()
+                        .maxAttempts(maxAttempts)
+                        .initialDelay(Duration.ZERO)
+                        .maxDelay(Duration.ZERO)
+                        .retryableStatusCodes(Set.of(429, 500, 502, 503, 504))
+                        .build())
                 .build();
     }
 
