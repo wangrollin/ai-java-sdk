@@ -21,6 +21,7 @@ import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -72,14 +73,47 @@ class AiClientTest {
     }
 
     @Test
+    void validatesOptionalChatRequestParameters() {
+        IllegalArgumentException temperature = assertThrows(IllegalArgumentException.class, () -> ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .temperature(-0.1)
+                .build());
+        IllegalArgumentException topP = assertThrows(IllegalArgumentException.class, () -> ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .topP(-0.1)
+                .build());
+        IllegalArgumentException finiteTemperature = assertThrows(IllegalArgumentException.class, () -> ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .temperature(Double.NaN)
+                .build());
+        IllegalArgumentException maxTokens = assertThrows(IllegalArgumentException.class, () -> ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .maxTokens(0)
+                .build());
+        IllegalArgumentException stopSequence = assertThrows(IllegalArgumentException.class, () -> ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .stopSequence(" ")
+                .build());
+
+        assertEquals("temperature must not be negative", temperature.getMessage());
+        assertEquals("topP must not be negative", topP.getMessage());
+        assertEquals("temperature must be finite", finiteTemperature.getMessage());
+        assertEquals("maxTokens must be positive", maxTokens.getMessage());
+        assertEquals("stopSequence must not be blank", stopSequence.getMessage());
+    }
+
+    @Test
     void sendsChatCompletionRequestAndParsesText() throws Exception {
         AtomicReference<CapturedRequest> captured = new AtomicReference<>();
         startServer(exchange -> {
             captured.set(capture(exchange));
             respond(exchange, 200, """
                     {
+                      "id": "chatcmpl-test",
+                      "model": "test-model",
                       "choices": [
                         {
+                          "finish_reason": "stop",
                           "message": {
                             "role": "assistant",
                             "content": "Hello from the model"
@@ -96,6 +130,9 @@ class AiClientTest {
                 .build());
 
         assertEquals("Hello from the model", response.text());
+        assertEquals("chatcmpl-test", response.id());
+        assertEquals("test-model", response.model());
+        assertEquals("stop", response.finishReason());
         assertEquals("/chat/completions", captured.get().path());
         assertEquals("POST", captured.get().method());
         assertEquals("Bearer test-key", captured.get().authorization());
@@ -105,6 +142,52 @@ class AiClientTest {
         assertEquals("test-model", requestJson.path("model").asText());
         assertEquals("user", requestJson.path("messages").path(0).path("role").asText());
         assertEquals("Hello", requestJson.path("messages").path(0).path("content").asText());
+        assertFalse(requestJson.has("temperature"));
+        assertFalse(requestJson.has("top_p"));
+        assertFalse(requestJson.has("max_tokens"));
+        assertFalse(requestJson.has("stop"));
+    }
+
+    @Test
+    void sendsOptionalChatRequestParametersWhenConfigured() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok"}}]}
+                    """);
+        });
+
+        testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .temperature(0.2)
+                .topP(0.9)
+                .maxTokens(128)
+                .stopSequences(List.of("END", "DONE"))
+                .build());
+
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        assertEquals(0.2, requestJson.path("temperature").asDouble());
+        assertEquals(0.9, requestJson.path("top_p").asDouble());
+        assertEquals(128, requestJson.path("max_tokens").asInt());
+        assertEquals("END", requestJson.path("stop").path(0).asText());
+        assertEquals("DONE", requestJson.path("stop").path(1).asText());
+    }
+
+    @Test
+    void responseMetadataIsOptional() throws Exception {
+        startServer(exchange -> respond(exchange, 200, """
+                {"choices":[{"message":{"content":"ok"}}]}
+                """));
+
+        ChatResponse response = testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build());
+
+        assertEquals("ok", response.text());
+        assertNull(response.id());
+        assertNull(response.model());
+        assertNull(response.finishReason());
     }
 
     @Test

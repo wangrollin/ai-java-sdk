@@ -81,6 +81,21 @@ ChatResponse response = client.chat(ChatRequest.builder()
 System.out.println(response.text());
 ```
 
+Request-level generation options can be set when a call needs to override the provider defaults:
+
+```java
+ChatResponse response = client.chat(ChatRequest.builder()
+    .message(ChatMessage.system("Answer with concise engineering guidance."))
+    .message(ChatMessage.user("How should I handle retries?"))
+    .temperature(0.2)
+    .topP(0.9)
+    .maxTokens(300)
+    .stopSequence("END")
+    .build());
+```
+
+`ChatResponse` exposes the generated `text()` plus optional provider metadata such as `id()`, `model()`, and `finishReason()`. These fields are useful for diagnostics and request correlation; avoid logging API keys, prompts, or model outputs unless your application has explicit redaction and retention controls.
+
 For incremental output, consume a `ChatStream` with try-with-resources:
 
 ```java

@@ -99,10 +99,22 @@ public final class AiClient {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
         payload.put("messages", messages);
+        putIfPresent(payload, "temperature", request.temperature());
+        putIfPresent(payload, "top_p", request.topP());
+        putIfPresent(payload, "max_tokens", request.maxTokens());
+        if (!request.stopSequences().isEmpty()) {
+            payload.put("stop", request.stopSequences());
+        }
         if (stream) {
             payload.put("stream", true);
         }
         return payload;
+    }
+
+    private static void putIfPresent(Map<String, Object> payload, String name, Object value) {
+        if (value != null) {
+            payload.put(name, value);
+        }
     }
 
     private URI chatCompletionsUri() {
@@ -175,14 +187,23 @@ public final class AiClient {
     private ChatResponse parseChatResponse(String body) {
         try {
             JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode content = root.path("choices").path(0).path("message").path("content");
+            JsonNode choice = root.path("choices").path(0);
+            JsonNode content = choice.path("message").path("content");
             if (!content.isTextual()) {
                 throw new AiException("Chat response did not contain choices[0].message.content");
             }
-            return new ChatResponse(content.asText());
+            return new ChatResponse(
+                    content.asText(),
+                    optionalText(root.path("id")),
+                    optionalText(root.path("model")),
+                    optionalText(choice.path("finish_reason")));
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse chat response", e);
         }
+    }
+
+    private static String optionalText(JsonNode node) {
+        return node.isTextual() ? node.asText() : null;
     }
 
     private static URI normalizeBaseUri(String baseUrl) {
