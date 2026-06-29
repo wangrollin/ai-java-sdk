@@ -1,8 +1,11 @@
-package io.wangrolliin.ai;
+package io.wangrollin.ai;
 
 import java.time.Duration;
 import java.util.Set;
 
+/**
+ * Retry settings for transient chat request failures.
+ */
 public final class RetryPolicy {
     private static final Set<Integer> DEFAULT_RETRYABLE_STATUS_CODES = Set.of(429, 500, 502, 503, 504);
 
@@ -27,6 +30,11 @@ public final class RetryPolicy {
         }
     }
 
+    /**
+     * Creates a policy that performs no retries.
+     *
+     * @return retry-disabled policy
+     */
     public static RetryPolicy none() {
         return builder()
                 .maxAttempts(1)
@@ -36,30 +44,66 @@ public final class RetryPolicy {
                 .build();
     }
 
+    /**
+     * Creates the default retry policy for common transient provider responses.
+     *
+     * @return default retry policy
+     */
     public static RetryPolicy defaultPolicy() {
         return builder().build();
     }
 
+    /**
+     * Starts building a retry policy.
+     *
+     * @return retry policy builder
+     */
     public static Builder builder() {
         return new Builder();
     }
 
+    /**
+     * Returns the total number of attempts, including the first request.
+     *
+     * @return total attempt count
+     */
     public int maxAttempts() {
         return maxAttempts;
     }
 
+    /**
+     * Returns the delay before the first retry.
+     *
+     * @return initial retry delay
+     */
     public Duration initialDelay() {
         return initialDelay;
     }
 
+    /**
+     * Returns the maximum exponential backoff delay.
+     *
+     * @return maximum retry delay
+     */
     public Duration maxDelay() {
         return maxDelay;
     }
 
+    /**
+     * Returns HTTP status codes that should be retried before the attempt limit.
+     *
+     * @return immutable retryable status code set
+     */
     public Set<Integer> retryableStatusCodes() {
         return retryableStatusCodes;
     }
 
+    /**
+     * Checks whether a response status is retryable.
+     *
+     * @param statusCode HTTP response status
+     * @return {@code true} when this status should be retried
+     */
     public boolean shouldRetryStatus(int statusCode) {
         return retryableStatusCodes.contains(statusCode);
     }
@@ -82,6 +126,9 @@ public final class RetryPolicy {
         }
     }
 
+    /**
+     * Builder for {@link RetryPolicy}.
+     */
     public static final class Builder {
         private int maxAttempts = 3;
         private Duration initialDelay = Duration.ofMillis(200);
@@ -91,21 +138,45 @@ public final class RetryPolicy {
         private Builder() {
         }
 
+        /**
+         * Sets the total number of attempts, including the first request.
+         *
+         * @param maxAttempts positive total attempt count
+         * @return this builder
+         */
         public Builder maxAttempts(int maxAttempts) {
             this.maxAttempts = maxAttempts;
             return this;
         }
 
+        /**
+         * Sets the delay before the first retry.
+         *
+         * @param initialDelay non-negative retry delay
+         * @return this builder
+         */
         public Builder initialDelay(Duration initialDelay) {
             this.initialDelay = initialDelay;
             return this;
         }
 
+        /**
+         * Sets the maximum exponential backoff delay.
+         *
+         * @param maxDelay non-negative maximum delay
+         * @return this builder
+         */
         public Builder maxDelay(Duration maxDelay) {
             this.maxDelay = maxDelay;
             return this;
         }
 
+        /**
+         * Replaces the retryable HTTP status code set.
+         *
+         * @param retryableStatusCodes statuses that should be retried
+         * @return this builder
+         */
         public Builder retryableStatusCodes(Set<Integer> retryableStatusCodes) {
             if (retryableStatusCodes == null) {
                 throw new IllegalArgumentException("retryableStatusCodes must not be null");
@@ -114,6 +185,11 @@ public final class RetryPolicy {
             return this;
         }
 
+        /**
+         * Builds an immutable retry policy.
+         *
+         * @return retry policy
+         */
         public RetryPolicy build() {
             return new RetryPolicy(this);
         }

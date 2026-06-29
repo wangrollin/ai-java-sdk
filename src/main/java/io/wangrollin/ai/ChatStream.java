@@ -1,4 +1,4 @@
-package io.wangrolliin.ai;
+package io.wangrollin.ai;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -13,6 +13,12 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
+/**
+ * Auto-closeable iterator over OpenAI-compatible server-sent chat events.
+ *
+ * <p>Callers should consume this type with try-with-resources so the underlying
+ * HTTP response body is closed even when stream parsing fails midway.
+ */
 public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     private final BufferedReader reader;
     private final ObjectMapper objectMapper;
@@ -25,6 +31,11 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
         this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
     }
 
+    /**
+     * Returns a lazy iterator that reads deltas from the response body on demand.
+     *
+     * @return iterator over parsed streaming deltas
+     */
     @Override
     public Iterator<ChatDelta> iterator() {
         return new Iterator<>() {
@@ -59,6 +70,9 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
         };
     }
 
+    /**
+     * Closes the response body backing this stream.
+     */
     @Override
     public void close() {
         if (closed) {

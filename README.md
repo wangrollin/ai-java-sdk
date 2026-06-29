@@ -1,5 +1,7 @@
 # ai-java-sdk
 
+[![CI](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml)
+
 `ai-java-sdk` is a production-oriented Java SDK for building AI features in backend systems.
 
 The goal of this project is not to be another thin wrapper around a model provider's HTTP API. It is intended to provide a Java-first foundation for teams that need reliable, observable, and maintainable AI integrations in real applications.
@@ -56,14 +58,14 @@ This project is at an early stage. The README describes the intended direction a
 The first implementation milestone supports synchronous and streaming OpenAI-compatible chat completions.
 
 ```java
-import io.wangrolliin.ai.AiClient;
-import io.wangrolliin.ai.AiChatClient;
-import io.wangrolliin.ai.ChatDelta;
-import io.wangrolliin.ai.ChatMessage;
-import io.wangrolliin.ai.ChatRequest;
-import io.wangrolliin.ai.ChatResponse;
-import io.wangrolliin.ai.ChatStream;
-import io.wangrolliin.ai.RetryPolicy;
+import io.wangrollin.ai.AiClient;
+import io.wangrollin.ai.AiChatClient;
+import io.wangrollin.ai.ChatDelta;
+import io.wangrollin.ai.ChatMessage;
+import io.wangrollin.ai.ChatRequest;
+import io.wangrollin.ai.ChatResponse;
+import io.wangrollin.ai.ChatStream;
+import io.wangrollin.ai.RetryPolicy;
 
 import java.time.Duration;
 
@@ -130,11 +132,11 @@ Streaming requests only retry failures that happen before a successful response 
 Application code can depend on the `AiChatClient` interface and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
 
 ```java
-import io.wangrolliin.ai.AiChatClient;
-import io.wangrolliin.ai.ChatDelta;
-import io.wangrolliin.ai.ChatMessage;
-import io.wangrolliin.ai.ChatRequest;
-import io.wangrolliin.ai.FakeAiClient;
+import io.wangrollin.ai.AiChatClient;
+import io.wangrollin.ai.ChatDelta;
+import io.wangrollin.ai.ChatMessage;
+import io.wangrollin.ai.ChatRequest;
+import io.wangrollin.ai.FakeAiClient;
 
 AiChatClient client = FakeAiClient.builder()
     .chatResponse("Test response")
@@ -155,6 +157,10 @@ Run the test suite with:
 ```shell
 mvn test
 ```
+
+The HTTP client tests start a local in-process HTTP server on an ephemeral port. In locked-down
+sandboxes, the test command may need permission to bind a local port even though it does not call
+an external AI provider.
 
 ## License
 

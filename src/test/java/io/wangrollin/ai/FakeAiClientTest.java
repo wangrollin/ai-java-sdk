@@ -1,4 +1,4 @@
-package io.wangrolliin.ai;
+package io.wangrollin.ai;
 
 import org.junit.jupiter.api.Test;
 

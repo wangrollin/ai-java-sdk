@@ -1,4 +1,4 @@
-package io.wangrolliin.ai;
+package io.wangrollin.ai;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -17,8 +17,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
+/**
+ * OpenAI-compatible HTTP implementation of {@link AiChatClient}.
+ */
 public final class AiClient implements AiChatClient {
+    /**
+     * Default OpenAI-compatible API base URL.
+     */
     public static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
+
+    /**
+     * Default request and connection timeout.
+     */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
@@ -44,6 +54,11 @@ public final class AiClient implements AiChatClient {
                 : builder.httpClient;
     }
 
+    /**
+     * Starts building an HTTP AI client.
+     *
+     * @return client builder
+     */
     public static Builder builder() {
         return new Builder();
     }
@@ -243,6 +258,9 @@ public final class AiClient implements AiChatClient {
         }
     }
 
+    /**
+     * Builder for {@link AiClient}.
+     */
     public static final class Builder {
         private String apiKey;
         private String baseUrl;
@@ -254,26 +272,56 @@ public final class AiClient implements AiChatClient {
         private Builder() {
         }
 
+        /**
+         * Sets the provider API key used for bearer authentication.
+         *
+         * @param apiKey API key value; do not commit real keys to source control
+         * @return this builder
+         */
         public Builder apiKey(String apiKey) {
             this.apiKey = apiKey;
             return this;
         }
 
+        /**
+         * Sets the OpenAI-compatible base URL.
+         *
+         * @param baseUrl provider base URL, with or without a trailing slash
+         * @return this builder
+         */
         public Builder baseUrl(String baseUrl) {
             this.baseUrl = baseUrl;
             return this;
         }
 
+        /**
+         * Sets the model used when a request does not provide its own model.
+         *
+         * @param defaultModel provider model name
+         * @return this builder
+         */
         public Builder defaultModel(String defaultModel) {
             this.defaultModel = defaultModel;
             return this;
         }
 
+        /**
+         * Sets the HTTP connection and request timeout.
+         *
+         * @param timeout positive timeout duration
+         * @return this builder
+         */
         public Builder timeout(Duration timeout) {
             this.timeout = timeout;
             return this;
         }
 
+        /**
+         * Sets retry behavior for transient response statuses and send failures.
+         *
+         * @param retryPolicy retry policy to use
+         * @return this builder
+         */
         public Builder retryPolicy(RetryPolicy retryPolicy) {
             this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy must not be null");
             return this;
@@ -284,6 +332,11 @@ public final class AiClient implements AiChatClient {
             return this;
         }
 
+        /**
+         * Builds the client after validating required configuration.
+         *
+         * @return configured AI client
+         */
         public AiClient build() {
             return new AiClient(this);
         }
