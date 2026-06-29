@@ -1,15 +1,12 @@
 package io.wangrollin.ai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Queue;
 
@@ -20,7 +17,7 @@ import java.util.Queue;
  * reading API keys, opening sockets, or depending on provider availability.
  */
 public final class FakeAiClient implements AiChatClient {
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
 
     private final Queue<Outcome<ChatResponse>> chatOutcomes;
     private final Queue<Outcome<StreamResponse>> streamOutcomes;
@@ -78,23 +75,16 @@ public final class FakeAiClient implements AiChatClient {
                     .append("\n\n");
         }
         body.append("data: [DONE]\n\n");
-        return new ChatStream(new ByteArrayInputStream(body.toString().getBytes(StandardCharsets.UTF_8)), OBJECT_MAPPER);
+        return new ChatStream(new ByteArrayInputStream(body.toString().getBytes(StandardCharsets.UTF_8)), OPEN_AI_CODEC);
     }
 
     private static ChatStream malformedStreamFrom(String data) {
         String body = "data: " + data + "\n\n";
-        return new ChatStream(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), OBJECT_MAPPER);
+        return new ChatStream(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), OPEN_AI_CODEC);
     }
 
     private static String serializeDelta(ChatDelta delta) {
-        try {
-            Map<String, Object> choice = new LinkedHashMap<>();
-            choice.put("delta", Map.of("content", delta.text()));
-            choice.put("finish_reason", delta.finishReason());
-            return OBJECT_MAPPER.writeValueAsString(Map.of("choices", List.of(choice)));
-        } catch (JsonProcessingException e) {
-            throw new AiException("Failed to serialize fake stream event", e);
-        }
+        return OPEN_AI_CODEC.serializeStreamDelta(delta);
     }
 
     private record Outcome<T>(T value, RuntimeException failure) {

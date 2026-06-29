@@ -1,8 +1,6 @@
 package io.wangrollin.ai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -21,14 +19,14 @@ import java.util.Objects;
  */
 public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     private final BufferedReader reader;
-    private final ObjectMapper objectMapper;
+    private final OpenAiChatCodec codec;
     private boolean closed;
 
-    ChatStream(InputStream inputStream, ObjectMapper objectMapper) {
+    ChatStream(InputStream inputStream, OpenAiChatCodec codec) {
         this.reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(inputStream, "inputStream must not be null"),
                 StandardCharsets.UTF_8));
-        this.objectMapper = Objects.requireNonNull(objectMapper, "objectMapper must not be null");
+        this.codec = Objects.requireNonNull(codec, "codec must not be null");
     }
 
     /**
@@ -119,15 +117,10 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
 
     private ChatDelta parseDelta(String data) {
         try {
-            JsonNode choice = objectMapper.readTree(data).path("choices").path(0);
-            JsonNode content = choice.path("delta").path("content");
-            JsonNode finishReason = choice.path("finish_reason");
-            return new ChatDelta(
-                    content.isTextual() ? content.asText() : "",
-                    finishReason.isTextual() ? finishReason.asText() : null);
-        } catch (JsonProcessingException e) {
+            return codec.parseStreamDelta(data);
+        } catch (AiException e) {
             close();
-            throw new AiException("Failed to parse chat stream event", e);
+            throw e;
         }
     }
 }

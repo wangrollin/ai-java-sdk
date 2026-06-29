@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
@@ -27,6 +28,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AiClientTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
 
     private HttpServer server;
 
@@ -515,7 +517,7 @@ class AiClientTest {
                 data: [DONE]
 
                 """);
-        ChatStream stream = new ChatStream(inputStream, OBJECT_MAPPER);
+        ChatStream stream = new ChatStream(inputStream, OPEN_AI_CODEC);
 
         stream.close();
 

@@ -1,8 +1,6 @@
 package io.wangrollin.ai;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -12,9 +10,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
 /**
@@ -31,7 +26,7 @@ public final class AiClient implements AiChatClient {
      */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
 
     private final String apiKey;
     private final URI baseUri;
@@ -66,7 +61,7 @@ public final class AiClient implements AiChatClient {
     @Override
     public ChatResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String requestBody = serialize(chatPayload(request, false));
+        String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, false);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -82,13 +77,13 @@ public final class AiClient implements AiChatClient {
             throw new AiException("Chat request failed with HTTP status "
                     + response.statusCode() + ": " + summarize(response.body()));
         }
-        return parseChatResponse(response.body());
+        return OPEN_AI_CODEC.parseResponse(response.body());
     }
 
     @Override
     public ChatStream stream(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String requestBody = serialize(chatPayload(request, true));
+        String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, true);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -105,45 +100,11 @@ public final class AiClient implements AiChatClient {
             throw new AiException("Streaming chat request failed with HTTP status "
                     + response.statusCode() + ": " + summarize(readBody(response.body())));
         }
-        return new ChatStream(response.body(), OBJECT_MAPPER);
-    }
-
-    private Map<String, Object> chatPayload(ChatRequest request, boolean stream) {
-        String model = request.model() == null ? defaultModel : request.model();
-        List<Map<String, String>> messages = request.messages().stream()
-                .map(message -> Map.of("role", message.role(), "content", message.content()))
-                .toList();
-        Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("model", model);
-        payload.put("messages", messages);
-        putIfPresent(payload, "temperature", request.temperature());
-        putIfPresent(payload, "top_p", request.topP());
-        putIfPresent(payload, "max_tokens", request.maxTokens());
-        if (!request.stopSequences().isEmpty()) {
-            payload.put("stop", request.stopSequences());
-        }
-        if (stream) {
-            payload.put("stream", true);
-        }
-        return payload;
-    }
-
-    private static void putIfPresent(Map<String, Object> payload, String name, Object value) {
-        if (value != null) {
-            payload.put(name, value);
-        }
+        return new ChatStream(response.body(), OPEN_AI_CODEC);
     }
 
     private URI chatCompletionsUri() {
-        return baseUri.resolve("chat/completions");
-    }
-
-    private String serialize(Map<String, Object> payload) {
-        try {
-            return OBJECT_MAPPER.writeValueAsString(payload);
-        } catch (JsonProcessingException e) {
-            throw new AiException("Failed to serialize chat request", e);
-        }
+        return baseUri.resolve(OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
     }
 
     private <T> HttpResponse<T> sendWithRetry(
@@ -199,28 +160,6 @@ public final class AiClient implements AiChatClient {
 
     private static String capitalize(String value) {
         return Character.toUpperCase(value.charAt(0)) + value.substring(1);
-    }
-
-    private ChatResponse parseChatResponse(String body) {
-        try {
-            JsonNode root = OBJECT_MAPPER.readTree(body);
-            JsonNode choice = root.path("choices").path(0);
-            JsonNode content = choice.path("message").path("content");
-            if (!content.isTextual()) {
-                throw new AiException("Chat response did not contain choices[0].message.content");
-            }
-            return new ChatResponse(
-                    content.asText(),
-                    optionalText(root.path("id")),
-                    optionalText(root.path("model")),
-                    optionalText(choice.path("finish_reason")));
-        } catch (JsonProcessingException e) {
-            throw new AiException("Failed to parse chat response", e);
-        }
-    }
-
-    private static String optionalText(JsonNode node) {
-        return node.isTextual() ? node.asText() : null;
     }
 
     private static URI normalizeBaseUri(String baseUrl) {
