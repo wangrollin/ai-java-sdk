@@ -9,15 +9,28 @@ import java.util.Objects;
  * @param id optional provider response identifier
  * @param model optional provider model name
  * @param finishReason optional provider finish reason
+ * @param usage optional token accounting metadata
  */
-public record ChatResponse(String text, String id, String model, String finishReason) {
+public record ChatResponse(String text, String id, String model, String finishReason, ChatUsage usage) {
     /**
      * Creates a response that only carries generated text.
      *
      * @param text assistant text
      */
     public ChatResponse(String text) {
-        this(text, null, null, null);
+        this(text, null, null, null, null);
+    }
+
+    /**
+     * Creates a response without usage metadata.
+     *
+     * @param text assistant text
+     * @param id optional provider response identifier
+     * @param model optional provider model name
+     * @param finishReason optional provider finish reason
+     */
+    public ChatResponse(String text, String id, String model, String finishReason) {
+        this(text, id, model, finishReason, null);
     }
 
     /**
@@ -27,6 +40,7 @@ public record ChatResponse(String text, String id, String model, String finishRe
      * @param id optional provider response identifier
      * @param model optional provider model name
      * @param finishReason optional provider finish reason
+     * @param usage optional token accounting metadata
      */
     public ChatResponse {
         text = Objects.requireNonNull(text, "text must not be null");

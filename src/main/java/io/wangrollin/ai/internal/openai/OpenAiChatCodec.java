@@ -3,11 +3,13 @@ package io.wangrollin.ai.internal.openai;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.wangrollin.ai.AiError;
 import io.wangrollin.ai.AiException;
 import io.wangrollin.ai.ChatDelta;
 import io.wangrollin.ai.ChatMessage;
 import io.wangrollin.ai.ChatRequest;
 import io.wangrollin.ai.ChatResponse;
+import io.wangrollin.ai.ChatUsage;
 
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -58,9 +60,41 @@ public final class OpenAiChatCodec {
                     content.asText(),
                     optionalText(root.path("id")),
                     optionalText(root.path("model")),
-                    optionalText(choice.path("finish_reason")));
+                    optionalText(choice.path("finish_reason")),
+                    usage(root.path("usage")));
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse chat response", e);
+        }
+    }
+
+    /**
+     * Parses structured OpenAI-compatible error details, returning {@code null}
+     * when the body is empty, malformed, or does not contain a recognizable
+     * {@code error} object. HTTP error handling still uses the raw body summary
+     * as a fallback so callers get a useful diagnostic either way.
+     *
+     * @param body JSON error response body
+     * @return structured provider error details, or {@code null}
+     */
+    public AiError parseError(String body) {
+        if (body == null || body.isBlank()) {
+            return null;
+        }
+        try {
+            JsonNode error = objectMapper.readTree(body).path("error");
+            if (!error.isObject()) {
+                return null;
+            }
+            AiError parsed = new AiError(
+                    optionalText(error.path("message")),
+                    optionalText(error.path("type")),
+                    optionalScalarText(error.path("code")));
+            if (parsed.message() == null && parsed.type() == null && parsed.code() == null) {
+                return null;
+            }
+            return parsed;
+        } catch (JsonProcessingException e) {
+            return null;
         }
     }
 
@@ -132,5 +166,23 @@ public final class OpenAiChatCodec {
 
     private static String optionalText(JsonNode node) {
         return node.isTextual() ? node.asText() : null;
+    }
+
+    private static String optionalScalarText(JsonNode node) {
+        return node.isTextual() || node.isNumber() || node.isBoolean() ? node.asText() : null;
+    }
+
+    private static ChatUsage usage(JsonNode node) {
+        if (!node.isObject()) {
+            return null;
+        }
+        return new ChatUsage(
+                optionalInt(node.path("prompt_tokens")),
+                optionalInt(node.path("completion_tokens")),
+                optionalInt(node.path("total_tokens")));
+    }
+
+    private static Integer optionalInt(JsonNode node) {
+        return node.canConvertToInt() ? node.asInt() : null;
     }
 }

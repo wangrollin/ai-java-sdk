@@ -60,10 +60,12 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 ```java
 import io.wangrollin.ai.AiClient;
 import io.wangrollin.ai.AiChatClient;
+import io.wangrollin.ai.AiException;
 import io.wangrollin.ai.ChatDelta;
 import io.wangrollin.ai.ChatMessage;
 import io.wangrollin.ai.ChatRequest;
 import io.wangrollin.ai.ChatResponse;
+import io.wangrollin.ai.ChatUsage;
 import io.wangrollin.ai.ChatStream;
 import io.wangrollin.ai.RetryPolicy;
 
@@ -97,7 +99,35 @@ ChatResponse response = client.chat(ChatRequest.builder()
     .build());
 ```
 
-`ChatResponse` exposes the generated `text()` plus optional provider metadata such as `id()`, `model()`, and `finishReason()`. These fields are useful for diagnostics and request correlation; avoid logging API keys, prompts, or model outputs unless your application has explicit redaction and retention controls.
+`ChatResponse` exposes the generated `text()` plus optional provider metadata such as `id()`, `model()`, `finishReason()`, and `usage()`. These fields are useful for diagnostics and request correlation; avoid logging API keys, prompts, or model outputs unless your application has explicit redaction and retention controls.
+
+```java
+ChatUsage usage = response.usage();
+if (usage != null) {
+    System.out.printf(
+        "prompt=%s completion=%s total=%s%n",
+        usage.promptTokens(),
+        usage.completionTokens(),
+        usage.totalTokens());
+}
+```
+
+Provider HTTP failures are surfaced as `AiException`. When an OpenAI-compatible error body is available, the exception includes the HTTP status code and structured provider details:
+
+```java
+try {
+    client.chat(ChatRequest.builder()
+        .message(ChatMessage.user("Hello"))
+        .build());
+} catch (AiException e) {
+    if (e.statusCode() != null && e.statusCode() == 429) {
+        // Apply application-level rate-limit handling or backoff here.
+    }
+    if (e.error() != null) {
+        System.err.println(e.error().code());
+    }
+}
+```
 
 For incremental output, consume a `ChatStream` with try-with-resources:
 

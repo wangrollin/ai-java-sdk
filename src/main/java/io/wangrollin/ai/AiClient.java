@@ -74,8 +74,7 @@ public final class AiClient implements AiChatClient {
                 HttpResponse.BodyHandlers.ofString(),
                 "chat request");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new AiException("Chat request failed with HTTP status "
-                    + response.statusCode() + ": " + summarize(response.body()));
+            throw providerResponseException("Chat request", response.statusCode(), response.body());
         }
         return OPEN_AI_CODEC.parseResponse(response.body());
     }
@@ -97,8 +96,7 @@ public final class AiClient implements AiChatClient {
                 HttpResponse.BodyHandlers.ofInputStream(),
                 "streaming chat request");
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            throw new AiException("Streaming chat request failed with HTTP status "
-                    + response.statusCode() + ": " + summarize(readBody(response.body())));
+            throw providerResponseException("Streaming chat request", response.statusCode(), readBody(response.body()));
         }
         return new ChatStream(response.body(), OPEN_AI_CODEC);
     }
@@ -195,6 +193,15 @@ public final class AiClient implements AiChatClient {
         } catch (IOException e) {
             throw new AiException("Failed to read error response body", e);
         }
+    }
+
+    private static AiException providerResponseException(String requestDescription, int statusCode, String body) {
+        AiError error = OPEN_AI_CODEC.parseError(body);
+        String detail = error != null && error.message() != null ? error.message() : summarize(body);
+        return new AiException(
+                requestDescription + " failed with HTTP status " + statusCode + ": " + detail,
+                statusCode,
+                error);
     }
 
     /**

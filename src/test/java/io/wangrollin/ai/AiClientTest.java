@@ -113,6 +113,11 @@ class AiClientTest {
                     {
                       "id": "chatcmpl-test",
                       "model": "test-model",
+                      "usage": {
+                        "prompt_tokens": 4,
+                        "completion_tokens": 5,
+                        "total_tokens": 9
+                      },
                       "choices": [
                         {
                           "finish_reason": "stop",
@@ -135,6 +140,7 @@ class AiClientTest {
         assertEquals("chatcmpl-test", response.id());
         assertEquals("test-model", response.model());
         assertEquals("stop", response.finishReason());
+        assertEquals(new ChatUsage(4, 5, 9), response.usage());
         assertEquals("/chat/completions", captured.get().path());
         assertEquals("POST", captured.get().method());
         assertEquals("Bearer test-key", captured.get().authorization());
@@ -190,6 +196,7 @@ class AiClientTest {
         assertNull(response.id());
         assertNull(response.model());
         assertNull(response.finishReason());
+        assertNull(response.usage());
     }
 
     @Test
@@ -223,6 +230,42 @@ class AiClientTest {
 
         assertTrue(exception.getMessage().contains("HTTP status 429"));
         assertTrue(exception.getMessage().contains("rate limited"));
+        assertEquals(429, exception.statusCode());
+        assertEquals("rate limited", exception.error().message());
+    }
+
+    @Test
+    void exposesStructuredProviderErrors() throws Exception {
+        startServer(exchange -> respond(exchange, 401, """
+                {
+                  "error": {
+                    "message": "invalid api key",
+                    "type": "authentication_error",
+                    "code": "invalid_api_key"
+                  }
+                }
+                """));
+
+        AiException exception = assertThrows(AiException.class, () -> testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build()));
+
+        assertEquals(401, exception.statusCode());
+        assertEquals(new AiError("invalid api key", "authentication_error", "invalid_api_key"), exception.error());
+        assertTrue(exception.getMessage().contains("invalid api key"));
+    }
+
+    @Test
+    void fallsBackToBodySummaryForNonJsonProviderErrors() throws Exception {
+        startServer(exchange -> respond(exchange, 502, "upstream unavailable"));
+
+        AiException exception = assertThrows(AiException.class, () -> testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build()));
+
+        assertEquals(502, exception.statusCode());
+        assertNull(exception.error());
+        assertTrue(exception.getMessage().contains("upstream unavailable"));
     }
 
     @Test
@@ -418,6 +461,8 @@ class AiClientTest {
 
         assertTrue(exception.getMessage().contains("HTTP status 429"));
         assertTrue(exception.getMessage().contains("stream rate limited"));
+        assertEquals(429, exception.statusCode());
+        assertEquals("stream rate limited", exception.error().message());
     }
 
     @Test
