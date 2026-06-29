@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-public final class AiClient {
+public final class AiClient implements AiChatClient {
     public static final String DEFAULT_BASE_URL = "https://api.openai.com/v1";
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
@@ -48,6 +48,7 @@ public final class AiClient {
         return new Builder();
     }
 
+    @Override
     public ChatResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         String requestBody = serialize(chatPayload(request, false));
@@ -69,6 +70,7 @@ public final class AiClient {
         return parseChatResponse(response.body());
     }
 
+    @Override
     public ChatStream stream(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         String requestBody = serialize(chatPayload(request, true));

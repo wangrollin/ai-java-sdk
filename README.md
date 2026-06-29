@@ -57,6 +57,7 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 
 ```java
 import io.wangrolliin.ai.AiClient;
+import io.wangrolliin.ai.AiChatClient;
 import io.wangrolliin.ai.ChatDelta;
 import io.wangrolliin.ai.ChatMessage;
 import io.wangrolliin.ai.ChatRequest;
@@ -66,7 +67,7 @@ import io.wangrolliin.ai.RetryPolicy;
 
 import java.time.Duration;
 
-AiClient client = AiClient.builder()
+AiChatClient client = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .baseUrl("https://api.openai.com/v1")
     .defaultModel("gpt-4.1-mini")
@@ -123,6 +124,31 @@ AiClient client = AiClient.builder()
 ```
 
 Streaming requests only retry failures that happen before a successful response stream is returned. Once stream consumption begins, malformed events or read failures are surfaced to the caller without replaying the request.
+
+## Testing Support
+
+Application code can depend on the `AiChatClient` interface and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
+
+```java
+import io.wangrolliin.ai.AiChatClient;
+import io.wangrolliin.ai.ChatDelta;
+import io.wangrolliin.ai.ChatMessage;
+import io.wangrolliin.ai.ChatRequest;
+import io.wangrolliin.ai.FakeAiClient;
+
+AiChatClient client = FakeAiClient.builder()
+    .chatResponse("Test response")
+    .streamDeltas(
+        new ChatDelta("Hel", null),
+        new ChatDelta("lo", "stop"))
+    .build();
+
+String text = client.chat(ChatRequest.builder()
+    .message(ChatMessage.user("Hello"))
+    .build()).text();
+```
+
+`FakeAiClient` can also be configured with failures through `chatFailure(...)`, `streamFailure(...)`, and `streamMalformedEvent(...)`, which is useful for testing retry wrappers, fallback behavior, and stream-consumption error handling in application code without calling a real provider.
 
 Run the test suite with:
 
