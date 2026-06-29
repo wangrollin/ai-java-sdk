@@ -53,13 +53,15 @@ This project is at an early stage. The README describes the intended direction a
 
 ## Minimal Usage
 
-The first implementation milestone supports synchronous OpenAI-compatible chat completions.
+The first implementation milestone supports synchronous and streaming OpenAI-compatible chat completions.
 
 ```java
 import io.wangrolliin.ai.AiClient;
+import io.wangrolliin.ai.ChatDelta;
 import io.wangrolliin.ai.ChatMessage;
 import io.wangrolliin.ai.ChatRequest;
 import io.wangrolliin.ai.ChatResponse;
+import io.wangrolliin.ai.ChatStream;
 
 import java.time.Duration;
 
@@ -75,6 +77,18 @@ ChatResponse response = client.chat(ChatRequest.builder()
     .build());
 
 System.out.println(response.text());
+```
+
+For incremental output, consume a `ChatStream` with try-with-resources:
+
+```java
+try (ChatStream stream = client.stream(ChatRequest.builder()
+    .message(ChatMessage.user("Tell me a short story"))
+    .build())) {
+    for (ChatDelta delta : stream) {
+        System.out.print(delta.text());
+    }
+}
 ```
 
 Run the test suite with:

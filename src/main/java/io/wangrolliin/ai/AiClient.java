@@ -5,11 +5,14 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -45,7 +48,7 @@ public final class AiClient {
 
     public ChatResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String requestBody = serialize(chatPayload(request));
+        String requestBody = serialize(chatPayload(request, false));
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -61,12 +64,37 @@ public final class AiClient {
         return parseChatResponse(response.body());
     }
 
-    private Map<String, Object> chatPayload(ChatRequest request) {
+    public ChatStream stream(ChatRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        String requestBody = serialize(chatPayload(request, true));
+        HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
+                .timeout(timeout)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        HttpResponse<InputStream> response = sendStream(httpRequest);
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            throw new AiException("Streaming chat request failed with HTTP status "
+                    + response.statusCode() + ": " + summarize(readBody(response.body())));
+        }
+        return new ChatStream(response.body(), OBJECT_MAPPER);
+    }
+
+    private Map<String, Object> chatPayload(ChatRequest request, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
         List<Map<String, String>> messages = request.messages().stream()
                 .map(message -> Map.of("role", message.role(), "content", message.content()))
                 .toList();
-        return Map.of("model", model, "messages", messages);
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("model", model);
+        payload.put("messages", messages);
+        if (stream) {
+            payload.put("stream", true);
+        }
+        return payload;
     }
 
     private URI chatCompletionsUri() {
@@ -89,6 +117,17 @@ public final class AiClient {
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
             throw new AiException("Chat request was interrupted", e);
+        }
+    }
+
+    private HttpResponse<InputStream> sendStream(HttpRequest request) {
+        try {
+            return httpClient.send(request, HttpResponse.BodyHandlers.ofInputStream());
+        } catch (IOException e) {
+            throw new AiException("Failed to send streaming chat request", e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new AiException("Streaming chat request was interrupted", e);
         }
     }
 
@@ -130,6 +169,14 @@ public final class AiClient {
             return normalized;
         }
         return normalized.substring(0, 500) + "...";
+    }
+
+    private static String readBody(InputStream body) {
+        try (body) {
+            return new String(body.readAllBytes(), StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new AiException("Failed to read error response body", e);
+        }
     }
 
     public static final class Builder {
