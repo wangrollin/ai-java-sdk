@@ -236,6 +236,52 @@ class AiClientTest {
     }
 
     @Test
+    void sendsToolsAndParsesToolCalls() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {
+                      "choices": [
+                        {
+                          "finish_reason": "tool_calls",
+                          "message": {
+                            "role": "assistant",
+                            "tool_calls": [
+                              {
+                                "id": "call-1",
+                                "type": "function",
+                                "function": {
+                                  "name": "lookup_weather",
+                                  "arguments": "{\\"city\\":\\"Shanghai\\"}"
+                                }
+                              }
+                            ]
+                          }
+                        }
+                      ]
+                    }
+                    """);
+        });
+
+        ChatResponse response = testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("What is the weather?"))
+                .tool(ChatTool.function("lookup_weather", "Look up current weather", """
+                        {"type":"object","properties":{"city":{"type":"string"}}}
+                        """))
+                .toolChoice(ChatToolChoice.required())
+                .build());
+
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        assertEquals("lookup_weather", requestJson.path("tools").path(0).path("function").path("name").asText());
+        assertEquals("required", requestJson.path("tool_choice").asText());
+        assertEquals("", response.text());
+        assertEquals("tool_calls", response.finishReason());
+        assertEquals(List.of(new ChatToolCall("call-1", "lookup_weather", "{\"city\":\"Shanghai\"}")),
+                response.toolCalls());
+    }
+
+    @Test
     void validatesResponseFormat() {
         IllegalArgumentException blankName = assertThrows(IllegalArgumentException.class, () ->
                 ChatResponseFormat.jsonSchema(" ", "{}"));

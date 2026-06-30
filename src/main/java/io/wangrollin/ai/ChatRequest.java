@@ -15,6 +15,8 @@ public final class ChatRequest {
     private final Integer maxTokens;
     private final List<String> stopSequences;
     private final ChatResponseFormat responseFormat;
+    private final List<ChatTool> tools;
+    private final ChatToolChoice toolChoice;
 
     private ChatRequest(Builder builder) {
         this.model = normalizeOptionalText(builder.model);
@@ -27,6 +29,8 @@ public final class ChatRequest {
         this.maxTokens = requirePositive(builder.maxTokens, "maxTokens");
         this.stopSequences = List.copyOf(builder.stopSequences);
         this.responseFormat = builder.responseFormat;
+        this.tools = List.copyOf(builder.tools);
+        this.toolChoice = builder.toolChoice;
     }
 
     /**
@@ -102,6 +106,24 @@ public final class ChatRequest {
     }
 
     /**
+     * Optional tool definitions that the model may request during generation.
+     *
+     * @return immutable tool list
+     */
+    public List<ChatTool> tools() {
+        return tools;
+    }
+
+    /**
+     * Optional selection policy for the tools advertised on this request.
+     *
+     * @return optional tool choice
+     */
+    public ChatToolChoice toolChoice() {
+        return toolChoice;
+    }
+
+    /**
      * Builder for {@link ChatRequest}.
      */
     public static final class Builder {
@@ -112,6 +134,8 @@ public final class ChatRequest {
         private Integer maxTokens;
         private final List<String> stopSequences = new ArrayList<>();
         private ChatResponseFormat responseFormat;
+        private final List<ChatTool> tools = new ArrayList<>();
+        private ChatToolChoice toolChoice;
 
         private Builder() {
         }
@@ -214,6 +238,40 @@ public final class ChatRequest {
          */
         public Builder responseFormat(ChatResponseFormat responseFormat) {
             this.responseFormat = Objects.requireNonNull(responseFormat, "responseFormat must not be null");
+            return this;
+        }
+
+        /**
+         * Adds one function tool that the provider may ask the application to execute.
+         *
+         * @param tool tool definition to advertise
+         * @return this builder
+         */
+        public Builder tool(ChatTool tool) {
+            this.tools.add(Objects.requireNonNull(tool, "tool must not be null"));
+            return this;
+        }
+
+        /**
+         * Adds multiple tools in list order.
+         *
+         * @param tools tool definitions to advertise
+         * @return this builder
+         */
+        public Builder tools(List<ChatTool> tools) {
+            Objects.requireNonNull(tools, "tools must not be null");
+            tools.forEach(this::tool);
+            return this;
+        }
+
+        /**
+         * Sets how the provider should choose from the advertised tools.
+         *
+         * @param toolChoice tool-selection policy
+         * @return this builder
+         */
+        public Builder toolChoice(ChatToolChoice toolChoice) {
+            this.toolChoice = Objects.requireNonNull(toolChoice, "toolChoice must not be null");
             return this;
         }
 

@@ -11,9 +11,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 class FakeAiClientTest {
     @Test
     void returnsConfiguredChatResponsesInOrderAndRecordsRequests() {
+        ChatToolCall toolCall = new ChatToolCall("call-1", "lookup_weather", "{\"city\":\"Shanghai\"}");
         FakeAiClient client = FakeAiClient.builder()
                 .chatResponse("first")
-                .chatResponse(new ChatResponse("second", "id-2", "model-2", "stop"))
+                .chatResponse(new ChatResponse("second", "id-2", "model-2", "tool_calls", null, List.of(toolCall)))
                 .build();
 
         ChatRequest firstRequest = ChatRequest.builder()
@@ -22,6 +23,7 @@ class FakeAiClientTest {
         ChatRequest secondRequest = ChatRequest.builder()
                 .model("override-model")
                 .message(ChatMessage.user("Second"))
+                .tool(ChatTool.function("lookup_weather", "{\"type\":\"object\",\"properties\":{}}"))
                 .build();
 
         assertEquals("first", client.chat(firstRequest).text());
@@ -29,15 +31,19 @@ class FakeAiClientTest {
 
         assertEquals("second", secondResponse.text());
         assertEquals("id-2", secondResponse.id());
+        assertEquals(List.of(toolCall), secondResponse.toolCalls());
         assertEquals(List.of(firstRequest, secondRequest), client.requests());
+        assertEquals("lookup_weather", client.requests().get(1).tools().get(0).name());
     }
 
     @Test
     void returnsConfiguredStreamDeltas() {
+        ChatToolCall toolCall = new ChatToolCall("call-1", "lookup_weather", "{\"city\"");
         FakeAiClient client = FakeAiClient.builder()
                 .streamDeltas(
                         new ChatDelta("Hel", null),
                         new ChatDelta("lo", null),
+                        new ChatDelta("", null, List.of(toolCall)),
                         new ChatDelta("", "stop"))
                 .build();
 
@@ -53,6 +59,7 @@ class FakeAiClientTest {
         assertEquals(List.of(
                 new ChatDelta("Hel", null),
                 new ChatDelta("lo", null),
+                new ChatDelta("", null, List.of(toolCall)),
                 new ChatDelta("", "stop")), deltas);
     }
 

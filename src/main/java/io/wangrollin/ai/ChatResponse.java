@@ -1,6 +1,7 @@
 package io.wangrollin.ai;
 
 import java.util.Objects;
+import java.util.List;
 
 /**
  * Complete response returned by a synchronous chat call.
@@ -10,15 +11,22 @@ import java.util.Objects;
  * @param model optional provider model name
  * @param finishReason optional provider finish reason
  * @param usage optional token accounting metadata
+ * @param toolCalls tool calls requested by the model
  */
-public record ChatResponse(String text, String id, String model, String finishReason, ChatUsage usage) {
+public record ChatResponse(
+        String text,
+        String id,
+        String model,
+        String finishReason,
+        ChatUsage usage,
+        List<ChatToolCall> toolCalls) {
     /**
      * Creates a response that only carries generated text.
      *
      * @param text assistant text
      */
     public ChatResponse(String text) {
-        this(text, null, null, null, null);
+        this(text, null, null, null, null, List.of());
     }
 
     /**
@@ -30,7 +38,20 @@ public record ChatResponse(String text, String id, String model, String finishRe
      * @param finishReason optional provider finish reason
      */
     public ChatResponse(String text, String id, String model, String finishReason) {
-        this(text, id, model, finishReason, null);
+        this(text, id, model, finishReason, null, List.of());
+    }
+
+    /**
+     * Creates a response with usage metadata and no tool calls.
+     *
+     * @param text assistant text
+     * @param id optional provider response identifier
+     * @param model optional provider model name
+     * @param finishReason optional provider finish reason
+     * @param usage optional token accounting metadata
+     */
+    public ChatResponse(String text, String id, String model, String finishReason, ChatUsage usage) {
+        this(text, id, model, finishReason, usage, List.of());
     }
 
     /**
@@ -44,5 +65,6 @@ public record ChatResponse(String text, String id, String model, String finishRe
      */
     public ChatResponse {
         text = Objects.requireNonNull(text, "text must not be null");
+        toolCalls = toolCalls == null ? List.of() : List.copyOf(toolCalls);
     }
 }

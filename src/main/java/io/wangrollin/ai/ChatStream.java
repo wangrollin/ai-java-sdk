@@ -103,7 +103,7 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
                     return null;
                 }
                 ChatDelta delta = parseDelta(data);
-                if (!delta.text().isEmpty() || delta.finishReason() != null) {
+                if (!delta.text().isEmpty() || delta.finishReason() != null || !delta.toolCalls().isEmpty()) {
                     return delta;
                 }
             }

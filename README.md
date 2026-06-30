@@ -68,6 +68,8 @@ import io.wangrollin.ai.ChatResponseFormat;
 import io.wangrollin.ai.ChatResponse;
 import io.wangrollin.ai.ChatUsage;
 import io.wangrollin.ai.ChatStream;
+import io.wangrollin.ai.ChatTool;
+import io.wangrollin.ai.ChatToolCall;
 import io.wangrollin.ai.RetryPolicy;
 
 import java.time.Duration;
@@ -97,7 +99,7 @@ ChatResponse response = client.chat(ChatRequest.builder()
     .topP(0.9)
     .maxTokens(300)
     .stopSequence("END")
-        .build());
+    .build());
 ```
 
 OpenAI-compatible structured output can be requested with either a JSON-object hint or a JSON
@@ -120,6 +122,37 @@ ChatResponse response = client.chat(ChatRequest.builder()
         }
         """))
     .build());
+```
+
+Tool calling is supported as request/response plumbing: the SDK sends tool definitions to the
+provider and returns requested tool calls, while the application remains responsible for executing
+trusted business logic and sending the tool result back.
+
+```java
+ChatResponse response = client.chat(ChatRequest.builder()
+    .message(ChatMessage.user("What is the weather in Shanghai?"))
+    .tool(ChatTool.function("lookup_weather", "Look up current weather by city.", """
+        {
+          "type": "object",
+          "properties": {
+            "city": { "type": "string" }
+          },
+          "required": ["city"],
+          "additionalProperties": false
+        }
+        """))
+    .build());
+
+for (ChatToolCall toolCall : response.toolCalls()) {
+    if ("lookup_weather".equals(toolCall.name())) {
+        String resultJson = "{\"temperatureCelsius\":21}";
+        ChatResponse finalResponse = client.chat(ChatRequest.builder()
+            .message(ChatMessage.user("What is the weather in Shanghai?"))
+            .message(ChatMessage.tool(toolCall.id(), resultJson))
+            .build());
+        System.out.println(finalResponse.text());
+    }
+}
 ```
 
 `ChatResponse` exposes the generated `text()` plus optional provider metadata such as `id()`, `model()`, `finishReason()`, and `usage()`. These fields are useful for diagnostics and request correlation; avoid logging API keys, prompts, or model outputs unless your application has explicit redaction and retention controls.

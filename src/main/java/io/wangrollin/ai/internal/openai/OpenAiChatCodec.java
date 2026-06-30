@@ -10,6 +10,9 @@ import io.wangrollin.ai.ChatMessage;
 import io.wangrollin.ai.ChatRequest;
 import io.wangrollin.ai.ChatResponse;
 import io.wangrollin.ai.ChatResponseFormat;
+import io.wangrollin.ai.ChatTool;
+import io.wangrollin.ai.ChatToolCall;
+import io.wangrollin.ai.ChatToolChoice;
 import io.wangrollin.ai.ChatUsage;
 
 import java.util.LinkedHashMap;
@@ -53,16 +56,19 @@ public final class OpenAiChatCodec {
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode choice = root.path("choices").path(0);
-            JsonNode content = choice.path("message").path("content");
-            if (!content.isTextual()) {
+            JsonNode message = choice.path("message");
+            JsonNode content = message.path("content");
+            List<ChatToolCall> toolCalls = toolCalls(message.path("tool_calls"));
+            if (!content.isTextual() && toolCalls.isEmpty()) {
                 throw new AiException("Chat response did not contain choices[0].message.content");
             }
             return new ChatResponse(
-                    content.asText(),
+                    content.isTextual() ? content.asText() : "",
                     optionalText(root.path("id")),
                     optionalText(root.path("model")),
                     optionalText(choice.path("finish_reason")),
-                    usage(root.path("usage")));
+                    usage(root.path("usage")),
+                    toolCalls);
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse chat response", e);
         }
@@ -112,7 +118,8 @@ public final class OpenAiChatCodec {
             JsonNode finishReason = choice.path("finish_reason");
             return new ChatDelta(
                     content.isTextual() ? content.asText() : "",
-                    finishReason.isTextual() ? finishReason.asText() : null);
+                    finishReason.isTextual() ? finishReason.asText() : null,
+                    toolCalls(choice.path("delta").path("tool_calls")));
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse chat stream event", e);
         }
@@ -127,7 +134,12 @@ public final class OpenAiChatCodec {
     public String serializeStreamDelta(ChatDelta delta) {
         try {
             Map<String, Object> choice = new LinkedHashMap<>();
-            choice.put("delta", Map.of("content", delta.text()));
+            Map<String, Object> deltaPayload = new LinkedHashMap<>();
+            deltaPayload.put("content", delta.text());
+            if (!delta.toolCalls().isEmpty()) {
+                deltaPayload.put("tool_calls", toolCallsPayload(delta.toolCalls()));
+            }
+            choice.put("delta", deltaPayload);
             choice.put("finish_reason", delta.finishReason());
             return objectMapper.writeValueAsString(Map.of("choices", List.of(choice)));
         } catch (JsonProcessingException e) {
@@ -137,7 +149,7 @@ public final class OpenAiChatCodec {
 
     private Map<String, Object> payload(ChatRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
-        List<Map<String, String>> messages = request.messages().stream()
+        List<Map<String, Object>> messages = request.messages().stream()
                 .map(OpenAiChatCodec::messagePayload)
                 .toList();
         Map<String, Object> payload = new LinkedHashMap<>();
@@ -150,6 +162,12 @@ public final class OpenAiChatCodec {
             payload.put("stop", request.stopSequences());
         }
         putIfPresent(payload, "response_format", responseFormatPayload(request.responseFormat()));
+        if (!request.tools().isEmpty()) {
+            payload.put("tools", request.tools().stream()
+                    .map(this::toolPayload)
+                    .toList());
+        }
+        putIfPresent(payload, "tool_choice", toolChoicePayload(request.toolChoice()));
         if (stream) {
             payload.put("stream", true);
         }
@@ -172,16 +190,44 @@ public final class OpenAiChatCodec {
         return payload;
     }
 
+    private Map<String, Object> toolPayload(ChatTool tool) {
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", tool.name());
+        putIfPresent(function, "description", tool.description());
+        function.put("parameters", parseJsonObject(tool.parametersJson(), "Failed to serialize chat tool"));
+        return Map.of("type", "function", "function", function);
+    }
+
+    private Object toolChoicePayload(ChatToolChoice toolChoice) {
+        if (toolChoice == null) {
+            return null;
+        }
+        if ("function".equals(toolChoice.mode())) {
+            return Map.of(
+                    "type", "function",
+                    "function", Map.of("name", toolChoice.functionName()));
+        }
+        return toolChoice.mode();
+    }
+
     private JsonNode parseSchema(String schemaJson) {
+        return parseJsonObject(schemaJson, "Failed to serialize chat response format");
+    }
+
+    private JsonNode parseJsonObject(String json, String errorMessage) {
         try {
-            return objectMapper.readTree(schemaJson);
+            return objectMapper.readTree(json);
         } catch (JsonProcessingException e) {
-            throw new AiException("Failed to serialize chat response format", e);
+            throw new AiException(errorMessage, e);
         }
     }
 
-    private static Map<String, String> messagePayload(ChatMessage message) {
-        return Map.of("role", message.role(), "content", message.content());
+    private static Map<String, Object> messagePayload(ChatMessage message) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("role", message.role());
+        payload.put("content", message.content());
+        putIfPresent(payload, "tool_call_id", message.toolCallId());
+        return payload;
     }
 
     private static void putIfPresent(Map<String, Object> payload, String name, Object value) {
@@ -210,5 +256,41 @@ public final class OpenAiChatCodec {
 
     private static Integer optionalInt(JsonNode node) {
         return node.canConvertToInt() ? node.asInt() : null;
+    }
+
+    private static List<ChatToolCall> toolCalls(JsonNode node) {
+        if (!node.isArray()) {
+            return List.of();
+        }
+        List<ChatToolCall> toolCalls = new java.util.ArrayList<>();
+        for (JsonNode item : node) {
+            JsonNode function = item.path("function");
+            String name = optionalText(function.path("name"));
+            if (name == null) {
+                continue;
+            }
+            toolCalls.add(new ChatToolCall(
+                    optionalText(item.path("id")),
+                    name,
+                    optionalText(function.path("arguments"))));
+        }
+        return toolCalls;
+    }
+
+    private static List<Map<String, Object>> toolCallsPayload(List<ChatToolCall> toolCalls) {
+        return toolCalls.stream()
+                .map(OpenAiChatCodec::toolCallPayload)
+                .toList();
+    }
+
+    private static Map<String, Object> toolCallPayload(ChatToolCall toolCall) {
+        Map<String, Object> function = new LinkedHashMap<>();
+        function.put("name", toolCall.name());
+        function.put("arguments", toolCall.argumentsJson());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        putIfPresent(payload, "id", toolCall.id());
+        payload.put("type", "function");
+        payload.put("function", function);
+        return payload;
     }
 }
