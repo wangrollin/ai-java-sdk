@@ -9,6 +9,7 @@ import io.wangrollin.ai.ChatDelta;
 import io.wangrollin.ai.ChatMessage;
 import io.wangrollin.ai.ChatRequest;
 import io.wangrollin.ai.ChatResponse;
+import io.wangrollin.ai.ChatResponseFormat;
 import io.wangrollin.ai.ChatUsage;
 
 import java.util.LinkedHashMap;
@@ -134,7 +135,7 @@ public final class OpenAiChatCodec {
         }
     }
 
-    private static Map<String, Object> payload(ChatRequest request, String defaultModel, boolean stream) {
+    private Map<String, Object> payload(ChatRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
         List<Map<String, String>> messages = request.messages().stream()
                 .map(OpenAiChatCodec::messagePayload)
@@ -148,10 +149,35 @@ public final class OpenAiChatCodec {
         if (!request.stopSequences().isEmpty()) {
             payload.put("stop", request.stopSequences());
         }
+        putIfPresent(payload, "response_format", responseFormatPayload(request.responseFormat()));
         if (stream) {
             payload.put("stream", true);
         }
         return payload;
+    }
+
+    private Map<String, Object> responseFormatPayload(ChatResponseFormat responseFormat) {
+        if (responseFormat == null) {
+            return null;
+        }
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", responseFormat.type());
+        if ("json_schema".equals(responseFormat.type())) {
+            Map<String, Object> jsonSchema = new LinkedHashMap<>();
+            jsonSchema.put("name", responseFormat.jsonSchemaName());
+            jsonSchema.put("schema", parseSchema(responseFormat.jsonSchema()));
+            jsonSchema.put("strict", responseFormat.strict());
+            payload.put("json_schema", jsonSchema);
+        }
+        return payload;
+    }
+
+    private JsonNode parseSchema(String schemaJson) {
+        try {
+            return objectMapper.readTree(schemaJson);
+        } catch (JsonProcessingException e) {
+            throw new AiException("Failed to serialize chat response format", e);
+        }
     }
 
     private static Map<String, String> messagePayload(ChatMessage message) {

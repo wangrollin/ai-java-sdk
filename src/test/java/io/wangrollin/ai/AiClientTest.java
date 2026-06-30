@@ -183,6 +183,73 @@ class AiClientTest {
     }
 
     @Test
+    void sendsJsonObjectResponseFormatWhenConfigured() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"{\\"answer\\":\\"ok\\"}"}}]}
+                    """);
+        });
+
+        testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Reply with JSON"))
+                .responseFormat(ChatResponseFormat.jsonObject())
+                .build());
+
+        JsonNode responseFormat = OBJECT_MAPPER.readTree(captured.get().body()).path("response_format");
+        assertEquals("json_object", responseFormat.path("type").asText());
+        assertFalse(responseFormat.has("json_schema"));
+    }
+
+    @Test
+    void sendsJsonSchemaResponseFormatWhenConfigured() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"{\\"answer\\":\\"ok\\"}"}}]}
+                    """);
+        });
+
+        testClient().chat(ChatRequest.builder()
+                .message(ChatMessage.user("Reply with JSON"))
+                .responseFormat(ChatResponseFormat.jsonSchema("answer_shape", """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "answer": { "type": "string" }
+                          },
+                          "required": ["answer"],
+                          "additionalProperties": false
+                        }
+                        """))
+                .build());
+
+        JsonNode responseFormat = OBJECT_MAPPER.readTree(captured.get().body()).path("response_format");
+        JsonNode jsonSchema = responseFormat.path("json_schema");
+        assertEquals("json_schema", responseFormat.path("type").asText());
+        assertEquals("answer_shape", jsonSchema.path("name").asText());
+        assertTrue(jsonSchema.path("strict").asBoolean());
+        assertEquals("object", jsonSchema.path("schema").path("type").asText());
+        assertEquals("string", jsonSchema.path("schema").path("properties").path("answer").path("type").asText());
+    }
+
+    @Test
+    void validatesResponseFormat() {
+        IllegalArgumentException blankName = assertThrows(IllegalArgumentException.class, () ->
+                ChatResponseFormat.jsonSchema(" ", "{}"));
+        IllegalArgumentException malformedSchema = assertThrows(IllegalArgumentException.class, () ->
+                ChatResponseFormat.jsonSchema("answer_shape", "{"));
+        IllegalArgumentException nonObjectSchema = assertThrows(IllegalArgumentException.class, () ->
+                ChatResponseFormat.jsonSchema("answer_shape", "[]"));
+
+        assertEquals("name must not be blank", blankName.getMessage());
+        assertEquals("schemaJson must be valid JSON", malformedSchema.getMessage());
+        assertEquals("schemaJson must be a JSON object", nonObjectSchema.getMessage());
+    }
+
+    @Test
     void responseMetadataIsOptional() throws Exception {
         startServer(exchange -> respond(exchange, 200, """
                 {"choices":[{"message":{"content":"ok"}}]}

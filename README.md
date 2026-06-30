@@ -64,6 +64,7 @@ import io.wangrollin.ai.AiException;
 import io.wangrollin.ai.ChatDelta;
 import io.wangrollin.ai.ChatMessage;
 import io.wangrollin.ai.ChatRequest;
+import io.wangrollin.ai.ChatResponseFormat;
 import io.wangrollin.ai.ChatResponse;
 import io.wangrollin.ai.ChatUsage;
 import io.wangrollin.ai.ChatStream;
@@ -96,6 +97,28 @@ ChatResponse response = client.chat(ChatRequest.builder()
     .topP(0.9)
     .maxTokens(300)
     .stopSequence("END")
+        .build());
+```
+
+OpenAI-compatible structured output can be requested with either a JSON-object hint or a JSON
+schema. The SDK validates that schema text is valid JSON before sending it, while keeping the
+provider-specific wire format inside the HTTP adapter.
+
+```java
+ChatResponse response = client.chat(ChatRequest.builder()
+    .message(ChatMessage.system("Return only JSON that matches the requested shape."))
+    .message(ChatMessage.user("Summarize the deployment risk."))
+    .responseFormat(ChatResponseFormat.jsonSchema("risk_summary", """
+        {
+          "type": "object",
+          "properties": {
+            "summary": { "type": "string" },
+            "risk": { "type": "string", "enum": ["low", "medium", "high"] }
+          },
+          "required": ["summary", "risk"],
+          "additionalProperties": false
+        }
+        """))
     .build());
 ```
 

@@ -14,6 +14,7 @@ public final class ChatRequest {
     private final Double topP;
     private final Integer maxTokens;
     private final List<String> stopSequences;
+    private final ChatResponseFormat responseFormat;
 
     private ChatRequest(Builder builder) {
         this.model = normalizeOptionalText(builder.model);
@@ -25,6 +26,7 @@ public final class ChatRequest {
         this.topP = requireNonNegative(builder.topP, "topP");
         this.maxTokens = requirePositive(builder.maxTokens, "maxTokens");
         this.stopSequences = List.copyOf(builder.stopSequences);
+        this.responseFormat = builder.responseFormat;
     }
 
     /**
@@ -91,6 +93,15 @@ public final class ChatRequest {
     }
 
     /**
+     * Optional structured-output hint for providers that support response formats.
+     *
+     * @return optional response format
+     */
+    public ChatResponseFormat responseFormat() {
+        return responseFormat;
+    }
+
+    /**
      * Builder for {@link ChatRequest}.
      */
     public static final class Builder {
@@ -100,6 +111,7 @@ public final class ChatRequest {
         private Double topP;
         private Integer maxTokens;
         private final List<String> stopSequences = new ArrayList<>();
+        private ChatResponseFormat responseFormat;
 
         private Builder() {
         }
@@ -191,6 +203,17 @@ public final class ChatRequest {
         public Builder stopSequences(List<String> stopSequences) {
             Objects.requireNonNull(stopSequences, "stopSequences must not be null");
             stopSequences.forEach(this::stopSequence);
+            return this;
+        }
+
+        /**
+         * Sets a structured-output response format for this request.
+         *
+         * @param responseFormat response format hint to send to compatible providers
+         * @return this builder
+         */
+        public Builder responseFormat(ChatResponseFormat responseFormat) {
+            this.responseFormat = Objects.requireNonNull(responseFormat, "responseFormat must not be null");
             return this;
         }
 
