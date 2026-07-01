@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.Consumer;
 
 /**
  * Auto-closeable iterator over OpenAI-compatible server-sent chat events.
@@ -20,13 +21,20 @@ import java.util.Objects;
 public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     private final BufferedReader reader;
     private final OpenAiChatCodec codec;
+    private final Consumer<AiException> failureListener;
     private boolean closed;
 
     ChatStream(InputStream inputStream, OpenAiChatCodec codec) {
+        this(inputStream, codec, failure -> {
+        });
+    }
+
+    ChatStream(InputStream inputStream, OpenAiChatCodec codec, Consumer<AiException> failureListener) {
         this.reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(inputStream, "inputStream must not be null"),
                 StandardCharsets.UTF_8));
         this.codec = Objects.requireNonNull(codec, "codec must not be null");
+        this.failureListener = Objects.requireNonNull(failureListener, "failureListener must not be null");
     }
 
     /**
@@ -111,7 +119,9 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
             return null;
         } catch (IOException e) {
             close();
-            throw new AiException("Failed to read chat stream", e);
+            AiException exception = new AiException("Failed to read chat stream", e);
+            failureListener.accept(exception);
+            throw exception;
         }
     }
 
@@ -120,6 +130,7 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
             return codec.parseStreamDelta(data);
         } catch (AiException e) {
             close();
+            failureListener.accept(e);
             throw e;
         }
     }

@@ -60,6 +60,7 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 ```java
 import io.wangrollin.ai.AiClient;
 import io.wangrollin.ai.AiChatClient;
+import io.wangrollin.ai.AiEventListener;
 import io.wangrollin.ai.AiException;
 import io.wangrollin.ai.ChatDelta;
 import io.wangrollin.ai.ChatMessage;
@@ -166,6 +167,39 @@ if (usage != null) {
         usage.completionTokens(),
         usage.totalTokens());
 }
+```
+
+Safe lifecycle events can be connected to application logging, metrics, or tracing code. Event
+payloads intentionally exclude API keys, prompts, model outputs, tool arguments, and raw provider
+response bodies.
+
+```java
+AiEventListener listener = new AiEventListener() {
+    @Override
+    public void requestSucceeded(io.wangrollin.ai.AiResponseEvent event) {
+        System.out.printf(
+            "operation=%s model=%s status=%s duration=%s%n",
+            event.operation(),
+            event.model(),
+            event.statusCode(),
+            event.duration());
+    }
+
+    @Override
+    public void requestFailed(io.wangrollin.ai.AiFailureEvent event) {
+        System.err.printf(
+            "operation=%s status=%s message=%s%n",
+            event.operation(),
+            event.statusCode(),
+            event.message());
+    }
+};
+
+AiChatClient observedClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .eventListener(listener)
+    .build();
 ```
 
 Provider HTTP failures are surfaced as `AiException`. When an OpenAI-compatible error body is available, the exception includes the HTTP status code and structured provider details:
