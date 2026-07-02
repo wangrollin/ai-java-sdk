@@ -1,5 +1,11 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.testing;
 
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
 import java.io.ByteArrayInputStream;
@@ -75,12 +81,16 @@ public final class FakeAiClient implements AiChatClient {
                     .append("\n\n");
         }
         body.append("data: [DONE]\n\n");
-        return new ChatStream(new ByteArrayInputStream(body.toString().getBytes(StandardCharsets.UTF_8)), OPEN_AI_CODEC);
+        return new ChatStream(
+                new ByteArrayInputStream(body.toString().getBytes(StandardCharsets.UTF_8)),
+                OPEN_AI_CODEC::parseStreamDelta);
     }
 
     private static ChatStream malformedStreamFrom(String data) {
         String body = "data: " + data + "\n\n";
-        return new ChatStream(new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)), OPEN_AI_CODEC);
+        return new ChatStream(
+                new ByteArrayInputStream(body.getBytes(StandardCharsets.UTF_8)),
+                OPEN_AI_CODEC::parseStreamDelta);
     }
 
     private static String serializeDelta(ChatDelta delta) {

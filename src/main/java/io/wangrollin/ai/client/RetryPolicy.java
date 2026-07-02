@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.client;
 
 import java.time.Duration;
 import java.util.Set;

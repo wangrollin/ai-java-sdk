@@ -1,6 +1,6 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.chat;
 
-import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
+import io.wangrollin.ai.error.AiException;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -11,6 +11,7 @@ import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 import java.util.function.Consumer;
+import java.util.function.Function;
 
 /**
  * Auto-closeable iterator over OpenAI-compatible server-sent chat events.
@@ -20,20 +21,37 @@ import java.util.function.Consumer;
  */
 public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     private final BufferedReader reader;
-    private final OpenAiChatCodec codec;
+    private final Function<String, ChatDelta> deltaParser;
     private final Consumer<AiException> failureListener;
     private boolean closed;
 
-    ChatStream(InputStream inputStream, OpenAiChatCodec codec) {
-        this(inputStream, codec, failure -> {
+    /**
+     * Creates a stream backed by an input body and provider-specific delta parser.
+     *
+     * @param inputStream raw server-sent event response body
+     * @param deltaParser parser for each non-empty {@code data:} value
+     */
+    public ChatStream(InputStream inputStream, Function<String, ChatDelta> deltaParser) {
+        this(inputStream, deltaParser, failure -> {
         });
     }
 
-    ChatStream(InputStream inputStream, OpenAiChatCodec codec, Consumer<AiException> failureListener) {
+    /**
+     * Creates a stream with a failure callback used by transports to emit diagnostics
+     * when lazy stream consumption fails after the HTTP request has succeeded.
+     *
+     * @param inputStream raw server-sent event response body
+     * @param deltaParser parser for each non-empty {@code data:} value
+     * @param failureListener callback for stream read or parse failures
+     */
+    public ChatStream(
+            InputStream inputStream,
+            Function<String, ChatDelta> deltaParser,
+            Consumer<AiException> failureListener) {
         this.reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(inputStream, "inputStream must not be null"),
                 StandardCharsets.UTF_8));
-        this.codec = Objects.requireNonNull(codec, "codec must not be null");
+        this.deltaParser = Objects.requireNonNull(deltaParser, "deltaParser must not be null");
         this.failureListener = Objects.requireNonNull(failureListener, "failureListener must not be null");
     }
 
@@ -127,7 +145,7 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
 
     private ChatDelta parseDelta(String data) {
         try {
-            return codec.parseStreamDelta(data);
+            return deltaParser.apply(data);
         } catch (AiException e) {
             close();
             failureListener.accept(e);

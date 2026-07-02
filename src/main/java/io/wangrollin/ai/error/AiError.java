@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.error;
 
 /**
  * Structured provider error details when an HTTP response body exposes them.

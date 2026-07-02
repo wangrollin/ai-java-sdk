@@ -1,8 +1,14 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.internal.openai;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatTool;
+import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.chat.ChatToolChoice;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;

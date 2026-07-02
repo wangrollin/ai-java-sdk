@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.chat;
 
 import java.util.Objects;
 

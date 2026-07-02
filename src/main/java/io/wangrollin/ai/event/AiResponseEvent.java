@@ -1,4 +1,6 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.event;
+
+import io.wangrollin.ai.chat.ChatUsage;
 
 import java.net.URI;
 import java.time.Duration;

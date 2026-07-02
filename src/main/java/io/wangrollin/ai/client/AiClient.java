@@ -1,5 +1,15 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.client;
 
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.error.AiError;
+import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.event.AiEventListener;
+import io.wangrollin.ai.event.AiFailureEvent;
+import io.wangrollin.ai.event.AiRequestEvent;
+import io.wangrollin.ai.event.AiResponseEvent;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
 import java.io.IOException;
@@ -136,7 +146,7 @@ public final class AiClient implements AiChatClient {
         long streamOpenNanos = System.nanoTime();
         return new ChatStream(
                 response.body(),
-                OPEN_AI_CODEC,
+                OPEN_AI_CODEC::parseStreamDelta,
                 failure -> emitFailure(
                         "stream",
                         model,
@@ -423,8 +433,18 @@ public final class AiClient implements AiChatClient {
             return this;
         }
 
-        Builder httpClient(HttpClient httpClient) {
-            this.httpClient = httpClient;
+        /**
+         * Sets the HTTP client used by this SDK client.
+         *
+         * <p>This hook is useful for tests and applications that need a
+         * preconfigured JDK HTTP client, for example to customize proxy,
+         * executor, authenticator, or TLS behavior.
+         *
+         * @param httpClient HTTP client to use for requests
+         * @return this builder
+         */
+        public Builder httpClient(HttpClient httpClient) {
+            this.httpClient = Objects.requireNonNull(httpClient, "httpClient must not be null");
             return this;
         }
 

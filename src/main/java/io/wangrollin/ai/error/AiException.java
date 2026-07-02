@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.error;
 
 /**
  * Base unchecked exception for SDK call failures.

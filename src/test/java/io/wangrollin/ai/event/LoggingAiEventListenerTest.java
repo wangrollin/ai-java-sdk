@@ -1,5 +1,7 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.event;
 
+import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.error.AiException;
 import org.junit.jupiter.api.Test;
 
 import java.lang.System.Logger;

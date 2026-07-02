@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.event;
 
 /**
  * Receives safe request lifecycle events for diagnostics, metrics, or tracing.

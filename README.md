@@ -58,21 +58,21 @@ This project is at an early stage. The README describes the intended direction a
 The first implementation milestone supports synchronous and streaming OpenAI-compatible chat completions.
 
 ```java
-import io.wangrollin.ai.AiClient;
-import io.wangrollin.ai.AiChatClient;
-import io.wangrollin.ai.AiEventListener;
-import io.wangrollin.ai.AiException;
-import io.wangrollin.ai.ChatDelta;
-import io.wangrollin.ai.ChatMessage;
-import io.wangrollin.ai.ChatRequest;
-import io.wangrollin.ai.ChatResponseFormat;
-import io.wangrollin.ai.ChatResponse;
-import io.wangrollin.ai.ChatUsage;
-import io.wangrollin.ai.ChatStream;
-import io.wangrollin.ai.ChatTool;
-import io.wangrollin.ai.ChatToolCall;
-import io.wangrollin.ai.LoggingAiEventListener;
-import io.wangrollin.ai.RetryPolicy;
+import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.event.AiEventListener;
+import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponseFormat;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatTool;
+import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.event.LoggingAiEventListener;
+import io.wangrollin.ai.client.RetryPolicy;
 
 import java.time.Duration;
 
@@ -177,7 +177,7 @@ response bodies.
 ```java
 AiEventListener listener = new AiEventListener() {
     @Override
-    public void requestSucceeded(io.wangrollin.ai.AiResponseEvent event) {
+    public void requestSucceeded(io.wangrollin.ai.event.AiResponseEvent event) {
         System.out.printf(
             "operation=%s model=%s status=%s duration=%s%n",
             event.operation(),
@@ -187,7 +187,7 @@ AiEventListener listener = new AiEventListener() {
     }
 
     @Override
-    public void requestFailed(io.wangrollin.ai.AiFailureEvent event) {
+    public void requestFailed(io.wangrollin.ai.event.AiFailureEvent event) {
         System.err.printf(
             "operation=%s status=%s message=%s%n",
             event.operation(),
@@ -266,11 +266,11 @@ Streaming requests only retry failures that happen before a successful response 
 Application code can depend on the `AiChatClient` interface and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
 
 ```java
-import io.wangrollin.ai.AiChatClient;
-import io.wangrollin.ai.ChatDelta;
-import io.wangrollin.ai.ChatMessage;
-import io.wangrollin.ai.ChatRequest;
-import io.wangrollin.ai.FakeAiClient;
+import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.testing.FakeAiClient;
 
 AiChatClient client = FakeAiClient.builder()
     .chatResponse("Test response")

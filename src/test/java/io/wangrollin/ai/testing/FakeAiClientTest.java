@@ -1,5 +1,13 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.testing;
 
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatTool;
+import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.error.AiException;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;

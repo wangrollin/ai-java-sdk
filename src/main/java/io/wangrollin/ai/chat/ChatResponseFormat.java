@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.chat;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.chat;
 
 /**
  * Token usage metadata returned by providers that report accounting details.

@@ -1,9 +1,21 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.client;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.wangrollin.ai.chat.ChatDelta;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatResponseFormat;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatTool;
+import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.chat.ChatToolChoice;
+import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.error.AiError;
+import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -675,7 +687,7 @@ class AiClientTest {
                 data: [DONE]
 
                 """);
-        ChatStream stream = new ChatStream(inputStream, OPEN_AI_CODEC);
+        ChatStream stream = new ChatStream(inputStream, OPEN_AI_CODEC::parseStreamDelta);
 
         stream.close();
 

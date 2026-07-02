@@ -1,7 +1,15 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.event;
 
 import com.sun.net.httpserver.HttpExchange;
 import com.sun.net.httpserver.HttpServer;
+import io.wangrollin.ai.chat.ChatMessage;
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.RetryPolicy;
+import io.wangrollin.ai.error.AiException;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 

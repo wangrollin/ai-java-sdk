@@ -1,4 +1,9 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.client;
+
+import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.error.AiException;
 
 /**
  * Minimal chat contract that application code can depend on without coupling

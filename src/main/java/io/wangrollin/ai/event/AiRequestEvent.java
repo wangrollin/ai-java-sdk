@@ -1,4 +1,4 @@
-package io.wangrollin.ai;
+package io.wangrollin.ai.event;
 
 import java.net.URI;
 import java.util.Objects;
