@@ -71,6 +71,7 @@ import io.wangrollin.ai.ChatUsage;
 import io.wangrollin.ai.ChatStream;
 import io.wangrollin.ai.ChatTool;
 import io.wangrollin.ai.ChatToolCall;
+import io.wangrollin.ai.LoggingAiEventListener;
 import io.wangrollin.ai.RetryPolicy;
 
 import java.time.Duration;
@@ -199,6 +200,19 @@ AiChatClient observedClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(listener)
+    .build();
+```
+
+For a ready-to-use logging integration, attach `LoggingAiEventListener`. It uses JDK
+`System.Logger` and formats only the safe lifecycle metadata exposed by the SDK event types.
+
+```java
+AiChatClient loggedClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .eventListener(LoggingAiEventListener.builder()
+        .logStartedEvents(false)
+        .build())
     .build();
 ```
 
