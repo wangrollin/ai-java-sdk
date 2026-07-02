@@ -21,10 +21,10 @@ Before opening a pull request:
 The Maven build enforces these versions during validation so contributors see environment
 problems before they become CI-only failures.
 
-Run the test suite before submitting a pull request:
+Run the same verification command as CI before submitting a pull request:
 
 ```shell
-mvn test
+mvn verify
 ```
 
 The test suite uses an in-process HTTP server to exercise request serialization, retries, and
@@ -56,7 +56,7 @@ A pull request can be merged when:
 
 - The motivation and behavior change are clear.
 - The change is small enough to review effectively.
-- `mvn test` passes, or any failure is explained.
+- `mvn verify` passes, or any failure is explained.
 - GitHub Actions CI passes for the pull request.
 - New behavior has focused tests.
 - Public API changes include documentation updates.

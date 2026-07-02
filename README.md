@@ -1,6 +1,8 @@
 # ai-java-sdk
 
 [![CI](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![Java](https://img.shields.io/badge/java-25%2B-orange.svg)](pom.xml)
 
 `ai-java-sdk` is a production-oriented Java SDK for building AI features in backend systems.
 
@@ -52,6 +54,12 @@ This project is at an early stage. The README describes the intended direction a
 
 - JDK 25
 - Maven 3.9+
+
+Validate the project locally with:
+
+```shell
+mvn verify
+```
 
 ## Minimal Usage
 
