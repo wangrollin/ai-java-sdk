@@ -24,6 +24,11 @@ import java.util.Objects;
 
 /**
  * OpenAI-compatible HTTP implementation of {@link AiChatClient}.
+ *
+ * <p>The client owns HTTP request construction, retry handling, streaming
+ * response parsing, and safe lifecycle event emission. Provider-specific JSON
+ * details stay inside the internal OpenAI adapter so application code can
+ * depend on the smaller {@link AiChatClient} contract where possible.
  */
 public final class AiClient implements AiChatClient {
     /**
@@ -424,6 +429,10 @@ public final class AiClient implements AiChatClient {
 
         /**
          * Sets a listener for safe request lifecycle events.
+         *
+         * <p>Events intentionally expose metadata such as operation, model,
+         * status, duration, and attempt number; they do not include API keys,
+         * prompts, generated text, tool arguments, or raw provider bodies.
          *
          * @param eventListener listener to receive request diagnostics
          * @return this builder

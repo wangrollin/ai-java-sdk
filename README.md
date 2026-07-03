@@ -61,6 +61,9 @@ Validate the project locally with:
 mvn verify
 ```
 
+`mvn verify` also compiles the example sources under `src/examples/java` so public usage snippets
+stay aligned with the current API without being packaged into the runtime jar.
+
 ## Minimal Usage
 
 The first implementation milestone supports synchronous and streaming OpenAI-compatible chat completions.
@@ -303,6 +306,32 @@ mvn test
 The HTTP client tests start a local in-process HTTP server on an ephemeral port. In locked-down
 sandboxes, the test command may need permission to bind a local port even though it does not call
 an external AI provider.
+
+## Examples
+
+Small, compilable examples live in `src/examples/java/io/wangrollin/ai/examples`:
+
+- `BasicChatExample` sends a synchronous chat request.
+- `StreamingChatExample` consumes incremental streaming deltas.
+- `ToolCallingExample` shows provider tool-call plumbing while application code executes the tool.
+- `FakeAiClientExample` demonstrates in-memory test usage without API keys or sockets.
+
+The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
+keys, prompts containing private data, provider response bodies, or other sensitive values in the
+repository.
+
+## Release Readiness
+
+The project metadata includes license, SCM, issue tracker, and maintainer information expected by
+public Maven repositories. Before publishing a release, run:
+
+```shell
+mvn verify
+git status --short
+```
+
+Release signing keys, repository tokens, and publishing credentials should be configured only in the
+publisher's local environment or CI secrets store; they should never be committed to this repository.
 
 ## License
 

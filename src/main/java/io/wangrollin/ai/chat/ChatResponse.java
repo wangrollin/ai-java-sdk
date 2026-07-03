@@ -6,6 +6,10 @@ import java.util.List;
 /**
  * Complete response returned by a synchronous chat call.
  *
+ * <p>The {@link #text()} value is normalized to a non-null string. Provider
+ * metadata is optional because compatible APIs differ in how consistently they
+ * return identifiers, finish reasons, usage accounting, and tool calls.
+ *
  * @param text assistant text extracted from the first provider choice
  * @param id optional provider response identifier
  * @param model optional provider model name

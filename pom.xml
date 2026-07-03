@@ -12,17 +12,43 @@
     <name>ai-java-sdk</name>
     <description>A production-oriented Java SDK for backend AI integrations.</description>
     <url>https://github.com/wangrollin/ai-java-sdk</url>
+    <inceptionYear>2026</inceptionYear>
 
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
             <url>https://www.apache.org/licenses/LICENSE-2.0</url>
+            <distribution>repo</distribution>
         </license>
     </licenses>
+
+    <developers>
+        <developer>
+            <id>wangrollin</id>
+            <name>wangrollin</name>
+            <email>wangrollin@foxmail.com</email>
+            <roles>
+                <role>maintainer</role>
+            </roles>
+        </developer>
+    </developers>
+
+    <scm>
+        <connection>scm:git:https://github.com/wangrollin/ai-java-sdk.git</connection>
+        <developerConnection>scm:git:ssh://git@github.com/wangrollin/ai-java-sdk.git</developerConnection>
+        <url>https://github.com/wangrollin/ai-java-sdk</url>
+        <tag>HEAD</tag>
+    </scm>
+
+    <issueManagement>
+        <system>GitHub Issues</system>
+        <url>https://github.com/wangrollin/ai-java-sdk/issues</url>
+    </issueManagement>
 
     <properties>
         <maven.compiler.release>25</maven.compiler.release>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <build-helper-maven-plugin.version>3.6.0</build-helper-maven-plugin.version>
         <jackson.version>2.17.2</jackson.version>
         <junit.version>5.10.3</junit.version>
         <maven-enforcer-plugin.version>3.5.0</maven-enforcer-plugin.version>
@@ -48,6 +74,26 @@
 
     <build>
         <plugins>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>${build-helper-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>add-example-sources</id>
+                        <phase>generate-test-sources</phase>
+                        <goals>
+                            <goal>add-test-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>src/examples/java</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-enforcer-plugin</artifactId>

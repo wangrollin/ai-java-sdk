@@ -6,6 +6,10 @@ import java.util.Objects;
 
 /**
  * Immutable chat completion request.
+ *
+ * <p>Requests are provider-neutral at the public API boundary. The OpenAI-
+ * compatible adapter is responsible for translating these fields to the final
+ * wire shape, which keeps application code away from provider-specific maps.
  */
 public final class ChatRequest {
     private final String model;

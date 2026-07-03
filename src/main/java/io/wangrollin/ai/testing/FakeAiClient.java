@@ -21,6 +21,8 @@ import java.util.Queue;
  *
  * <p>The fake records requests and returns preconfigured outcomes without
  * reading API keys, opening sockets, or depending on provider availability.
+ * Configure one outcome per expected call; missing outcomes fail fast so tests
+ * do not accidentally accept unexpected AI interactions.
  */
 public final class FakeAiClient implements AiChatClient {
     private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
