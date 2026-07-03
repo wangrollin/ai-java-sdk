@@ -4,6 +4,11 @@ import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
+import io.wangrollin.ai.diagnostic.AiPayloadFailureEvent;
+import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
+import io.wangrollin.ai.diagnostic.AiPayloadResponseEvent;
+import io.wangrollin.ai.diagnostic.AiRedactionPolicy;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.event.AiEventListener;
@@ -49,6 +54,8 @@ public final class AiClient implements AiChatClient {
     private final Duration timeout;
     private final RetryPolicy retryPolicy;
     private final AiEventListener eventListener;
+    private final AiPayloadDiagnosticsListener payloadDiagnosticsListener;
+    private final AiRedactionPolicy redactionPolicy;
     private final HttpClient httpClient;
 
     private AiClient(Builder builder) {
@@ -61,6 +68,10 @@ public final class AiClient implements AiChatClient {
         }
         this.retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
         this.eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
+        this.payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
+                ? AiPayloadDiagnosticsListener.NOOP
+                : builder.payloadDiagnosticsListener;
+        this.redactionPolicy = builder.redactionPolicy == null ? AiRedactionPolicy.defaultPolicy() : builder.redactionPolicy;
         this.httpClient = builder.httpClient == null
                 ? HttpClient.newBuilder().connectTimeout(this.timeout).build()
                 : builder.httpClient;
@@ -80,6 +91,7 @@ public final class AiClient implements AiChatClient {
         Objects.requireNonNull(request, "request must not be null");
         String model = modelFor(request);
         String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, false);
+        emitPayloadRequest("chat", model, false, requestBody);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -96,11 +108,13 @@ public final class AiClient implements AiChatClient {
                 false);
         HttpResponse<String> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            emitPayloadFailure("chat", model, false, response.statusCode(), response.body());
             AiException exception = providerResponseException("Chat request", response.statusCode(), response.body());
             emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), exception);
             throw exception;
         }
         try {
+            emitPayloadResponse("chat", model, false, response.statusCode(), response.body());
             ChatResponse chatResponse = OPEN_AI_CODEC.parseResponse(response.body());
             emitSuccess(
                     "chat",
@@ -123,6 +137,7 @@ public final class AiClient implements AiChatClient {
         Objects.requireNonNull(request, "request must not be null");
         String model = modelFor(request);
         String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, true);
+        emitPayloadRequest("stream", model, true, requestBody);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -140,10 +155,12 @@ public final class AiClient implements AiChatClient {
                 true);
         HttpResponse<InputStream> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            String errorBody = readBody(response.body());
+            emitPayloadFailure("stream", model, true, response.statusCode(), errorBody);
             AiException exception = providerResponseException(
                     "Streaming chat request",
                     response.statusCode(),
-                    readBody(response.body()));
+                    errorBody);
             emitFailure("stream", model, true, result.attempt(), response.statusCode(), result.duration(), exception);
             throw exception;
         }
@@ -183,6 +200,7 @@ public final class AiClient implements AiChatClient {
                 if (!shouldRetryResponse(response.statusCode(), attempt)) {
                     return new AttemptResult<>(response, attempt, duration);
                 }
+                emitRetriedPayloadFailure(operation, model, stream, response.statusCode(), response.body());
                 emitFailure(operation, model, stream, attempt, response.statusCode(), duration, retryableStatusException(
                         capitalize(requestDescription),
                         response.statusCode()));
@@ -305,6 +323,64 @@ public final class AiClient implements AiChatClient {
                 safeMessage(exception)));
     }
 
+    private void emitPayloadRequest(String operation, String model, boolean stream, String body) {
+        if (!payloadDiagnosticsEnabled()) {
+            return;
+        }
+        payloadDiagnosticsListener.requestPayload(new AiPayloadRequestEvent(
+                operation,
+                model,
+                baseUri,
+                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
+                stream,
+                redactionPolicy.redactJson(body)));
+    }
+
+    private void emitPayloadResponse(String operation, String model, boolean stream, int statusCode, String body) {
+        if (!payloadDiagnosticsEnabled()) {
+            return;
+        }
+        payloadDiagnosticsListener.responsePayload(new AiPayloadResponseEvent(
+                operation,
+                model,
+                baseUri,
+                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
+                stream,
+                statusCode,
+                redactionPolicy.redactJson(body)));
+    }
+
+    private void emitPayloadFailure(String operation, String model, boolean stream, int statusCode, String body) {
+        if (!payloadDiagnosticsEnabled()) {
+            return;
+        }
+        payloadDiagnosticsListener.failurePayload(new AiPayloadFailureEvent(
+                operation,
+                model,
+                baseUri,
+                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
+                stream,
+                statusCode,
+                redactionPolicy.redactJson(body)));
+    }
+
+    private void emitRetriedPayloadFailure(String operation, String model, boolean stream, int statusCode, Object body) {
+        if (!payloadDiagnosticsEnabled()) {
+            return;
+        }
+        if (body instanceof InputStream inputStream) {
+            emitPayloadFailure(operation, model, stream, statusCode, readBody(inputStream));
+            return;
+        }
+        if (body instanceof String text) {
+            emitPayloadFailure(operation, model, stream, statusCode, text);
+        }
+    }
+
+    private boolean payloadDiagnosticsEnabled() {
+        return payloadDiagnosticsListener != AiPayloadDiagnosticsListener.NOOP;
+    }
+
     private static String safeMessage(RuntimeException exception) {
         if (exception instanceof AiException aiException && aiException.statusCode() != null) {
             return "HTTP status " + aiException.statusCode();
@@ -367,6 +443,8 @@ public final class AiClient implements AiChatClient {
         private Duration timeout;
         private RetryPolicy retryPolicy;
         private AiEventListener eventListener;
+        private AiPayloadDiagnosticsListener payloadDiagnosticsListener;
+        private AiRedactionPolicy redactionPolicy;
         private HttpClient httpClient;
 
         private Builder() {
@@ -439,6 +517,34 @@ public final class AiClient implements AiChatClient {
          */
         public Builder eventListener(AiEventListener eventListener) {
             this.eventListener = Objects.requireNonNull(eventListener, "eventListener must not be null");
+            return this;
+        }
+
+        /**
+         * Sets an opt-in listener for redacted provider request and response payloads.
+         *
+         * <p>Payload diagnostics are disabled by default. Even with redaction,
+         * applications should enable this only for controlled troubleshooting
+         * with appropriate log retention and access controls.
+         *
+         * @param payloadDiagnosticsListener listener to receive redacted payload diagnostics
+         * @return this builder
+         */
+        public Builder payloadDiagnosticsListener(AiPayloadDiagnosticsListener payloadDiagnosticsListener) {
+            this.payloadDiagnosticsListener = Objects.requireNonNull(
+                    payloadDiagnosticsListener,
+                    "payloadDiagnosticsListener must not be null");
+            return this;
+        }
+
+        /**
+         * Sets the redaction policy used before opt-in payload diagnostics are emitted.
+         *
+         * @param redactionPolicy redaction policy to apply
+         * @return this builder
+         */
+        public Builder redactionPolicy(AiRedactionPolicy redactionPolicy) {
+            this.redactionPolicy = Objects.requireNonNull(redactionPolicy, "redactionPolicy must not be null");
             return this;
         }
 

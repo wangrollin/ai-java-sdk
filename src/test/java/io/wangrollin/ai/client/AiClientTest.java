@@ -14,6 +14,10 @@ import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
 import io.wangrollin.ai.chat.ChatToolChoice;
 import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
+import io.wangrollin.ai.diagnostic.AiPayloadFailureEvent;
+import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
+import io.wangrollin.ai.diagnostic.AiPayloadResponseEvent;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
@@ -192,6 +196,50 @@ class AiClientTest {
         assertEquals(128, requestJson.path("max_tokens").asInt());
         assertEquals("END", requestJson.path("stop").path(0).asText());
         assertEquals("DONE", requestJson.path("stop").path(1).asText());
+    }
+
+    @Test
+    void emitsRedactedPayloadDiagnosticsWhenEnabled() throws Exception {
+        RecordingPayloadDiagnosticsListener diagnostics = new RecordingPayloadDiagnosticsListener();
+        startServer(exchange -> respond(exchange, 200, """
+                {
+                  "choices": [
+                    {
+                      "message": {
+                        "content": "secret answer",
+                        "tool_calls": [
+                          {
+                            "function": {
+                              "name": "lookup_weather",
+                              "arguments": "{\\"city\\":\\"Shanghai\\"}"
+                            }
+                          }
+                        ]
+                      }
+                    }
+                  ]
+                }
+                """));
+
+        ChatResponse response = testClient(diagnostics).chat(ChatRequest.builder()
+                .message(ChatMessage.user("secret prompt"))
+                .tool(ChatTool.function("lookup_weather", "Look up current weather", """
+                        {"type":"object","properties":{"city":{"type":"string"}}}
+                        """))
+                .build());
+
+        assertEquals("secret answer", response.text());
+        assertEquals(1, diagnostics.requests.size());
+        assertEquals(1, diagnostics.responses.size());
+        assertTrue(diagnostics.failures.isEmpty());
+        String diagnosticPayloads = diagnostics.requests + " " + diagnostics.responses;
+        assertFalse(diagnosticPayloads.contains("secret prompt"));
+        assertFalse(diagnosticPayloads.contains("secret answer"));
+        assertFalse(diagnosticPayloads.contains("Shanghai"));
+        assertFalse(diagnosticPayloads.contains("test-key"));
+        assertTrue(diagnosticPayloads.contains("<redacted>"));
+        assertTrue(diagnostics.requests.get(0).redactedBody().contains("lookup_weather"));
+        assertTrue(diagnostics.responses.get(0).redactedBody().contains("\"message\":\"<redacted>\""));
     }
 
     @Test
@@ -381,6 +429,32 @@ class AiClientTest {
     }
 
     @Test
+    void emitsRedactedFailurePayloadDiagnostics() throws Exception {
+        RecordingPayloadDiagnosticsListener diagnostics = new RecordingPayloadDiagnosticsListener();
+        startServer(exchange -> respond(exchange, 401, """
+                {
+                  "error": {
+                    "message": "invalid api key raw detail",
+                    "code": "invalid_api_key"
+                  }
+                }
+                """));
+
+        AiException exception = assertThrows(AiException.class, () -> testClient(diagnostics).chat(ChatRequest.builder()
+                .message(ChatMessage.user("secret prompt"))
+                .build()));
+
+        assertEquals(401, exception.statusCode());
+        assertEquals(1, diagnostics.requests.size());
+        assertEquals(1, diagnostics.failures.size());
+        assertTrue(diagnostics.responses.isEmpty());
+        String diagnosticPayloads = diagnostics.requests + " " + diagnostics.failures;
+        assertFalse(diagnosticPayloads.contains("secret prompt"));
+        assertFalse(diagnosticPayloads.contains("invalid api key raw detail"));
+        assertTrue(diagnostics.failures.get(0).redactedBody().contains("invalid_api_key"));
+    }
+
+    @Test
     void fallsBackToBodySummaryForNonJsonProviderErrors() throws Exception {
         startServer(exchange -> respond(exchange, 502, "upstream unavailable"));
 
@@ -433,6 +507,36 @@ class AiClientTest {
 
         assertEquals("ok after retry", response.text());
         assertEquals(2, attempts.get());
+    }
+
+    @Test
+    void payloadDiagnosticsIncludesRetryableHttpFailures() throws Exception {
+        RecordingPayloadDiagnosticsListener diagnostics = new RecordingPayloadDiagnosticsListener();
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            int attempt = attempts.incrementAndGet();
+            if (attempt == 1) {
+                respond(exchange, 429, """
+                        {"error":{"message":"raw rate limit detail","code":"rate_limit"}}
+                        """);
+                return;
+            }
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok after retry"}}]}
+                    """);
+        });
+
+        ChatResponse response = retryingTestClient(2, diagnostics).chat(ChatRequest.builder()
+                .message(ChatMessage.user("secret prompt"))
+                .build());
+
+        assertEquals("ok after retry", response.text());
+        assertEquals(1, diagnostics.requests.size());
+        assertEquals(1, diagnostics.failures.size());
+        assertEquals(1, diagnostics.responses.size());
+        assertFalse(diagnostics.toString().contains("secret prompt"));
+        assertFalse(diagnostics.toString().contains("raw rate limit detail"));
+        assertTrue(diagnostics.failures.get(0).redactedBody().contains("rate_limit"));
     }
 
     @Test
@@ -550,6 +654,31 @@ class AiClientTest {
         assertTrue(requestJson.path("stream").asBoolean());
         assertEquals("user", requestJson.path("messages").path(0).path("role").asText());
         assertEquals("Hello", requestJson.path("messages").path(0).path("content").asText());
+    }
+
+    @Test
+    void streamingDiagnosticsOnlyRecordsRequestForSuccessfulStream() throws Exception {
+        RecordingPayloadDiagnosticsListener diagnostics = new RecordingPayloadDiagnosticsListener();
+        startServer(exchange -> respondStream(exchange, """
+                data: {"choices":[{"delta":{"content":"secret stream answer"},"finish_reason":null}]}
+
+                data: [DONE]
+
+                """));
+
+        try (ChatStream stream = testClient(diagnostics).stream(ChatRequest.builder()
+                .message(ChatMessage.user("secret prompt"))
+                .build())) {
+            for (ChatDelta ignored : stream) {
+                // Consume the stream to prove diagnostics do not cache successful stream bodies.
+            }
+        }
+
+        assertEquals(1, diagnostics.requests.size());
+        assertTrue(diagnostics.responses.isEmpty());
+        assertTrue(diagnostics.failures.isEmpty());
+        assertFalse(diagnostics.requests.get(0).redactedBody().contains("secret prompt"));
+        assertFalse(diagnostics.toString().contains("secret stream answer"));
     }
 
     @Test
@@ -695,16 +824,27 @@ class AiClientTest {
     }
 
     private AiClient testClient() {
-        return AiClient.builder()
+        return testClient(null);
+    }
+
+    private AiClient testClient(AiPayloadDiagnosticsListener diagnosticsListener) {
+        AiClient.Builder builder = AiClient.builder()
                 .apiKey("test-key")
                 .baseUrl("http://localhost:" + server.getAddress().getPort())
                 .defaultModel("test-model")
-                .timeout(Duration.ofSeconds(5))
-                .build();
+                .timeout(Duration.ofSeconds(5));
+        if (diagnosticsListener != null) {
+            builder.payloadDiagnosticsListener(diagnosticsListener);
+        }
+        return builder.build();
     }
 
     private AiClient retryingTestClient(int maxAttempts) {
-        return AiClient.builder()
+        return retryingTestClient(maxAttempts, null);
+    }
+
+    private AiClient retryingTestClient(int maxAttempts, AiPayloadDiagnosticsListener diagnosticsListener) {
+        AiClient.Builder builder = AiClient.builder()
                 .apiKey("test-key")
                 .baseUrl("http://localhost:" + server.getAddress().getPort())
                 .defaultModel("test-model")
@@ -714,8 +854,11 @@ class AiClientTest {
                         .initialDelay(Duration.ZERO)
                         .maxDelay(Duration.ZERO)
                         .retryableStatusCodes(Set.of(429, 500, 502, 503, 504))
-                        .build())
-                .build();
+                        .build());
+        if (diagnosticsListener != null) {
+            builder.payloadDiagnosticsListener(diagnosticsListener);
+        }
+        return builder.build();
     }
 
     private void startServer(ExchangeHandler handler) throws IOException {
@@ -776,6 +919,32 @@ class AiClientTest {
             String authorization,
             String contentType,
             String body) {
+    }
+
+    private static final class RecordingPayloadDiagnosticsListener implements AiPayloadDiagnosticsListener {
+        private final List<AiPayloadRequestEvent> requests = new ArrayList<>();
+        private final List<AiPayloadResponseEvent> responses = new ArrayList<>();
+        private final List<AiPayloadFailureEvent> failures = new ArrayList<>();
+
+        @Override
+        public void requestPayload(AiPayloadRequestEvent event) {
+            requests.add(event);
+        }
+
+        @Override
+        public void responsePayload(AiPayloadResponseEvent event) {
+            responses.add(event);
+        }
+
+        @Override
+        public void failurePayload(AiPayloadFailureEvent event) {
+            failures.add(event);
+        }
+
+        @Override
+        public String toString() {
+            return "requests=" + requests + ", responses=" + responses + ", failures=" + failures;
+        }
     }
 
     @FunctionalInterface

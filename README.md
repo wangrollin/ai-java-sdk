@@ -82,6 +82,7 @@ import io.wangrollin.ai.chat.ChatUsage;
 import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.diagnostic.LoggingAiPayloadDiagnosticsListener;
 import io.wangrollin.ai.event.AiMetricsSnapshot;
 import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
@@ -256,6 +257,23 @@ System.out.printf(
     snapshot.failedCount());
 ```
 
+When troubleshooting provider wire-shape problems, opt in to redacted payload diagnostics. This is
+separate from safe lifecycle events and is disabled by default. The default redaction policy hides
+message content, tool arguments, provider error messages, and credential-like fields before anything
+is logged.
+
+```java
+AiChatClient diagnosticClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .payloadDiagnosticsListener(LoggingAiPayloadDiagnosticsListener.create())
+    .build();
+```
+
+Use payload diagnostics only in controlled environments with appropriate log retention and access
+controls. Successful streaming responses are not buffered for diagnostics; only the redacted request
+payload and stream metadata are emitted.
+
 Provider HTTP failures are surfaced as `AiException`. When an OpenAI-compatible error body is available, the exception includes the HTTP status code and structured provider details:
 
 ```java
@@ -344,6 +362,7 @@ Small, compilable examples live in `src/examples/java/io/wangrollin/ai/examples`
 - `StreamingChatExample` consumes incremental streaming deltas.
 - `ToolCallingExample` shows provider tool-call plumbing while application code executes the tool.
 - `MetricsListenerExample` collects safe request metrics from lifecycle events.
+- `PayloadDiagnosticsExample` enables opt-in redacted payload diagnostics.
 - `FakeAiClientExample` demonstrates in-memory test usage without API keys or sockets.
 
 The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
