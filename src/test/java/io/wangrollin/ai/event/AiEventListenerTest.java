@@ -124,6 +124,49 @@ class AiEventListenerTest {
     }
 
     @Test
+    void inMemoryMetricsCollectsEventsFromRealClientRetries() throws Exception {
+        InMemoryAiMetricsListener metrics = InMemoryAiMetricsListener.create();
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            if (attempts.incrementAndGet() == 1) {
+                respond(exchange, 503, """
+                        {"error":{"message":"raw upstream detail"}}
+                        """);
+                return;
+            }
+            respond(exchange, 200, """
+                    {
+                      "model": "provider-model",
+                      "usage": {
+                        "prompt_tokens": 2,
+                        "completion_tokens": 5,
+                        "total_tokens": 7
+                      },
+                      "choices":[{"message":{"content":"ok"}}]
+                    }
+                    """);
+        });
+
+        ChatResponse response = retryingTestClient(metrics, 2).chat(ChatRequest.builder()
+                .message(ChatMessage.user("secret prompt"))
+                .build());
+
+        AiMetricsSnapshot snapshot = metrics.snapshot();
+        assertEquals("ok", response.text());
+        assertEquals(2, snapshot.startedCount());
+        assertEquals(1, snapshot.succeededCount());
+        assertEquals(1, snapshot.failedCount());
+        assertEquals(2, snapshot.startedByOperation().get("chat"));
+        assertEquals(1, snapshot.terminalByStatusCode().get(503));
+        assertEquals(1, snapshot.terminalByStatusCode().get(200));
+        assertEquals(1, snapshot.terminalByModel().get("test-model"));
+        assertEquals(1, snapshot.terminalByModel().get("provider-model"));
+        assertEquals(2, snapshot.promptTokens());
+        assertEquals(5, snapshot.completionTokens());
+        assertEquals(7, snapshot.totalTokens());
+    }
+
+    @Test
     void emitsSanitizedFailureForFinalProviderError() throws Exception {
         RecordingAiEventListener listener = new RecordingAiEventListener();
         startServer(exchange -> respond(exchange, 502, "raw upstream unavailable"));
@@ -215,7 +258,7 @@ class AiEventListenerTest {
         return builder.build();
     }
 
-    private AiClient retryingTestClient(RecordingAiEventListener listener, int maxAttempts) {
+    private AiClient retryingTestClient(AiEventListener listener, int maxAttempts) {
         return AiClient.builder()
                 .apiKey("test-key")
                 .baseUrl("http://localhost:" + server.getAddress().getPort())

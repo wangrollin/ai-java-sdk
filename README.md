@@ -82,6 +82,8 @@ import io.wangrollin.ai.chat.ChatUsage;
 import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
+import io.wangrollin.ai.event.AiMetricsSnapshot;
+import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
 import io.wangrollin.ai.client.RetryPolicy;
 
@@ -227,6 +229,33 @@ AiChatClient loggedClient = AiClient.builder()
     .build();
 ```
 
+For lightweight metrics without adding a telemetry dependency, attach `InMemoryAiMetricsListener`.
+It counts lifecycle attempts, terminal statuses, models, durations, and token usage from the same
+safe event payloads. Applications that already use Micrometer, OpenTelemetry, or another metrics
+stack can implement `AiEventListener` directly and bridge these safe fields into their own
+instruments.
+
+```java
+InMemoryAiMetricsListener metrics = InMemoryAiMetricsListener.create();
+
+AiChatClient measuredClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .eventListener(metrics)
+    .build();
+
+measuredClient.chat(ChatRequest.builder()
+    .message(ChatMessage.user("Give me one production-readiness check."))
+    .build());
+
+AiMetricsSnapshot snapshot = metrics.snapshot();
+System.out.printf(
+    "started=%s succeeded=%s failed=%s%n",
+    snapshot.startedCount(),
+    snapshot.succeededCount(),
+    snapshot.failedCount());
+```
+
 Provider HTTP failures are surfaced as `AiException`. When an OpenAI-compatible error body is available, the exception includes the HTTP status code and structured provider details:
 
 ```java
@@ -314,6 +343,7 @@ Small, compilable examples live in `src/examples/java/io/wangrollin/ai/examples`
 - `BasicChatExample` sends a synchronous chat request.
 - `StreamingChatExample` consumes incremental streaming deltas.
 - `ToolCallingExample` shows provider tool-call plumbing while application code executes the tool.
+- `MetricsListenerExample` collects safe request metrics from lifecycle events.
 - `FakeAiClientExample` demonstrates in-memory test usage without API keys or sockets.
 
 The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
