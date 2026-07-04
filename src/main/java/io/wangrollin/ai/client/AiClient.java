@@ -3,27 +3,21 @@ package io.wangrollin.ai.client;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.chat.ChatStream;
-import io.wangrollin.ai.chat.ChatUsage;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
-import io.wangrollin.ai.diagnostic.AiPayloadFailureEvent;
-import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
-import io.wangrollin.ai.diagnostic.AiPayloadResponseEvent;
 import io.wangrollin.ai.diagnostic.AiRedactionPolicy;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.event.AiEventListener;
-import io.wangrollin.ai.event.AiFailureEvent;
-import io.wangrollin.ai.event.AiRequestEvent;
-import io.wangrollin.ai.event.AiResponseEvent;
+import io.wangrollin.ai.internal.http.AiHttpExecutor;
+import io.wangrollin.ai.internal.http.AiHttpRequestSpec;
+import io.wangrollin.ai.internal.http.AiHttpResult;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 
-import java.io.IOException;
 import java.io.InputStream;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.Objects;
 
@@ -52,11 +46,7 @@ public final class AiClient implements AiChatClient {
     private final URI baseUri;
     private final String defaultModel;
     private final Duration timeout;
-    private final RetryPolicy retryPolicy;
-    private final AiEventListener eventListener;
-    private final AiPayloadDiagnosticsListener payloadDiagnosticsListener;
-    private final AiRedactionPolicy redactionPolicy;
-    private final HttpClient httpClient;
+    private final AiHttpExecutor httpExecutor;
 
     private AiClient(Builder builder) {
         this.apiKey = requireText(builder.apiKey, "apiKey");
@@ -66,15 +56,25 @@ public final class AiClient implements AiChatClient {
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
-        this.retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
-        this.eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
-        this.payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
+        RetryPolicy retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
+        AiEventListener eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
+        AiPayloadDiagnosticsListener payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
                 ? AiPayloadDiagnosticsListener.NOOP
                 : builder.payloadDiagnosticsListener;
-        this.redactionPolicy = builder.redactionPolicy == null ? AiRedactionPolicy.defaultPolicy() : builder.redactionPolicy;
-        this.httpClient = builder.httpClient == null
+        AiRedactionPolicy redactionPolicy = builder.redactionPolicy == null
+                ? AiRedactionPolicy.defaultPolicy()
+                : builder.redactionPolicy;
+        HttpClient httpClient = builder.httpClient == null
                 ? HttpClient.newBuilder().connectTimeout(this.timeout).build()
                 : builder.httpClient;
+        this.httpExecutor = new AiHttpExecutor(
+                httpClient,
+                retryPolicy,
+                eventListener,
+                payloadDiagnosticsListener,
+                redactionPolicy,
+                baseUri,
+                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
     }
 
     /**
@@ -91,7 +91,6 @@ public final class AiClient implements AiChatClient {
         Objects.requireNonNull(request, "request must not be null");
         String model = modelFor(request);
         String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, false);
-        emitPayloadRequest("chat", model, false, requestBody);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -99,24 +98,24 @@ public final class AiClient implements AiChatClient {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        AttemptResult<String> result = sendWithRetry(
+        AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
-                HttpResponse.BodyHandlers.ofString(),
                 "chat request",
                 "chat",
                 model,
-                false);
+                false,
+                requestBody), HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            emitPayloadFailure("chat", model, false, response.statusCode(), response.body());
+            httpExecutor.emitPayloadFailure("chat", model, false, response.statusCode(), response.body());
             AiException exception = providerResponseException("Chat request", response.statusCode(), response.body());
-            emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), exception);
+            httpExecutor.emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), exception);
             throw exception;
         }
         try {
-            emitPayloadResponse("chat", model, false, response.statusCode(), response.body());
+            httpExecutor.emitPayloadResponse("chat", model, false, response.statusCode(), response.body());
             ChatResponse chatResponse = OPEN_AI_CODEC.parseResponse(response.body());
-            emitSuccess(
+            httpExecutor.emitSuccess(
                     "chat",
                     eventModel(model, chatResponse.model()),
                     false,
@@ -127,7 +126,7 @@ public final class AiClient implements AiChatClient {
                     chatResponse.usage());
             return chatResponse;
         } catch (AiException e) {
-            emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), e);
+            httpExecutor.emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), e);
             throw e;
         }
     }
@@ -137,7 +136,6 @@ public final class AiClient implements AiChatClient {
         Objects.requireNonNull(request, "request must not be null");
         String model = modelFor(request);
         String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, true);
-        emitPayloadRequest("stream", model, true, requestBody);
         HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
@@ -146,116 +144,41 @@ public final class AiClient implements AiChatClient {
                 .POST(HttpRequest.BodyPublishers.ofString(requestBody))
                 .build();
 
-        AttemptResult<InputStream> result = sendWithRetry(
+        AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
-                HttpResponse.BodyHandlers.ofInputStream(),
                 "streaming chat request",
                 "stream",
                 model,
-                true);
+                true,
+                requestBody), HttpResponse.BodyHandlers.ofInputStream());
         HttpResponse<InputStream> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            String errorBody = readBody(response.body());
-            emitPayloadFailure("stream", model, true, response.statusCode(), errorBody);
+            String errorBody = AiHttpExecutor.readBody(response.body());
+            httpExecutor.emitPayloadFailure("stream", model, true, response.statusCode(), errorBody);
             AiException exception = providerResponseException(
                     "Streaming chat request",
                     response.statusCode(),
                     errorBody);
-            emitFailure("stream", model, true, result.attempt(), response.statusCode(), result.duration(), exception);
+            httpExecutor.emitFailure("stream", model, true, result.attempt(), response.statusCode(), result.duration(), exception);
             throw exception;
         }
-        emitSuccess("stream", model, true, result.attempt(), response.statusCode(), result.duration(), null, null);
+        httpExecutor.emitSuccess("stream", model, true, result.attempt(), response.statusCode(), result.duration(), null, null);
         long streamOpenNanos = System.nanoTime();
         return new ChatStream(
                 response.body(),
                 OPEN_AI_CODEC::parseStreamDelta,
-                failure -> emitFailure(
+                failure -> httpExecutor.emitFailure(
                         "stream",
                         model,
                         true,
                         result.attempt(),
                         response.statusCode(),
-                        result.duration().plus(elapsedSince(streamOpenNanos)),
+                        result.duration().plus(AiHttpExecutor.elapsedSince(streamOpenNanos)),
                         failure));
     }
 
     private URI chatCompletionsUri() {
         return baseUri.resolve(OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
-    }
-
-    private <T> AttemptResult<T> sendWithRetry(
-            HttpRequest request,
-            HttpResponse.BodyHandler<T> bodyHandler,
-            String requestDescription,
-            String operation,
-            String model,
-            boolean stream) {
-        for (int attempt = 1; attempt <= retryPolicy.maxAttempts(); attempt++) {
-            sleepBeforeRetry(attempt, requestDescription);
-            emitStarted(operation, model, stream, attempt);
-            long startNanos = System.nanoTime();
-            try {
-                HttpResponse<T> response = httpClient.send(request, bodyHandler);
-                Duration duration = elapsedSince(startNanos);
-                if (!shouldRetryResponse(response.statusCode(), attempt)) {
-                    return new AttemptResult<>(response, attempt, duration);
-                }
-                emitRetriedPayloadFailure(operation, model, stream, response.statusCode(), response.body());
-                emitFailure(operation, model, stream, attempt, response.statusCode(), duration, retryableStatusException(
-                        capitalize(requestDescription),
-                        response.statusCode()));
-                closeRetriedBody(response.body());
-            } catch (IOException e) {
-                Duration duration = elapsedSince(startNanos);
-                AiException exception = new AiException("Failed to send " + requestDescription, e);
-                emitFailure(operation, model, stream, attempt, null, duration, exception);
-                if (attempt == retryPolicy.maxAttempts()) {
-                    throw exception;
-                }
-            } catch (InterruptedException e) {
-                Duration duration = elapsedSince(startNanos);
-                Thread.currentThread().interrupt();
-                AiException exception = new AiException(capitalize(requestDescription) + " was interrupted", e);
-                emitFailure(operation, model, stream, attempt, null, duration, exception);
-                throw exception;
-            }
-        }
-        throw new AiException("Failed to send " + requestDescription);
-    }
-
-    private static void closeRetriedBody(Object body) {
-        if (body instanceof InputStream inputStream) {
-            try {
-                inputStream.close();
-            } catch (IOException e) {
-                throw new AiException("Failed to close retry response body", e);
-            }
-        }
-    }
-
-    private boolean shouldRetryResponse(int statusCode, int attempt) {
-        return attempt < retryPolicy.maxAttempts() && retryPolicy.shouldRetryStatus(statusCode);
-    }
-
-    private static AiException retryableStatusException(String requestDescription, int statusCode) {
-        return new AiException(requestDescription + " failed with retryable HTTP status " + statusCode, statusCode, null);
-    }
-
-    private void sleepBeforeRetry(int attempt, String requestDescription) {
-        Duration delay = retryPolicy.delayForAttempt(attempt);
-        if (delay.isZero()) {
-            return;
-        }
-        try {
-            Thread.sleep(delay.toMillis());
-        } catch (InterruptedException e) {
-            Thread.currentThread().interrupt();
-            throw new AiException(capitalize(requestDescription) + " was interrupted", e);
-        }
-    }
-
-    private static String capitalize(String value) {
-        return Character.toUpperCase(value.charAt(0)) + value.substring(1);
     }
 
     private String modelFor(ChatRequest request) {
@@ -264,129 +187,6 @@ public final class AiClient implements AiChatClient {
 
     private String eventModel(String requestModel, String responseModel) {
         return responseModel == null ? requestModel : responseModel;
-    }
-
-    private static Duration elapsedSince(long startNanos) {
-        return Duration.ofNanos(System.nanoTime() - startNanos);
-    }
-
-    private void emitStarted(String operation, String model, boolean stream, int attempt) {
-        eventListener.requestStarted(new AiRequestEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                attempt));
-    }
-
-    private void emitSuccess(
-            String operation,
-            String model,
-            boolean stream,
-            int attempt,
-            int statusCode,
-            Duration duration,
-            String finishReason,
-            ChatUsage usage) {
-        eventListener.requestSucceeded(new AiResponseEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                attempt,
-                statusCode,
-                duration,
-                finishReason,
-                usage));
-    }
-
-    private void emitFailure(
-            String operation,
-            String model,
-            boolean stream,
-            int attempt,
-            Integer statusCode,
-            Duration duration,
-            RuntimeException exception) {
-        eventListener.requestFailed(new AiFailureEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                attempt,
-                statusCode,
-                duration,
-                exception.getClass().getName(),
-                safeMessage(exception)));
-    }
-
-    private void emitPayloadRequest(String operation, String model, boolean stream, String body) {
-        if (!payloadDiagnosticsEnabled()) {
-            return;
-        }
-        payloadDiagnosticsListener.requestPayload(new AiPayloadRequestEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                redactionPolicy.redactJson(body)));
-    }
-
-    private void emitPayloadResponse(String operation, String model, boolean stream, int statusCode, String body) {
-        if (!payloadDiagnosticsEnabled()) {
-            return;
-        }
-        payloadDiagnosticsListener.responsePayload(new AiPayloadResponseEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                statusCode,
-                redactionPolicy.redactJson(body)));
-    }
-
-    private void emitPayloadFailure(String operation, String model, boolean stream, int statusCode, String body) {
-        if (!payloadDiagnosticsEnabled()) {
-            return;
-        }
-        payloadDiagnosticsListener.failurePayload(new AiPayloadFailureEvent(
-                operation,
-                model,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH,
-                stream,
-                statusCode,
-                redactionPolicy.redactJson(body)));
-    }
-
-    private void emitRetriedPayloadFailure(String operation, String model, boolean stream, int statusCode, Object body) {
-        if (!payloadDiagnosticsEnabled()) {
-            return;
-        }
-        if (body instanceof InputStream inputStream) {
-            emitPayloadFailure(operation, model, stream, statusCode, readBody(inputStream));
-            return;
-        }
-        if (body instanceof String text) {
-            emitPayloadFailure(operation, model, stream, statusCode, text);
-        }
-    }
-
-    private boolean payloadDiagnosticsEnabled() {
-        return payloadDiagnosticsListener != AiPayloadDiagnosticsListener.NOOP;
-    }
-
-    private static String safeMessage(RuntimeException exception) {
-        if (exception instanceof AiException aiException && aiException.statusCode() != null) {
-            return "HTTP status " + aiException.statusCode();
-        }
-        String message = exception.getMessage();
-        return message == null || message.isBlank() ? exception.getClass().getSimpleName() : message;
     }
 
     private static URI normalizeBaseUri(String baseUrl) {
@@ -414,14 +214,6 @@ public final class AiClient implements AiChatClient {
             return normalized;
         }
         return normalized.substring(0, 500) + "...";
-    }
-
-    private static String readBody(InputStream body) {
-        try (body) {
-            return new String(body.readAllBytes(), StandardCharsets.UTF_8);
-        } catch (IOException e) {
-            throw new AiException("Failed to read error response body", e);
-        }
     }
 
     private static AiException providerResponseException(String requestDescription, int statusCode, String body) {
@@ -573,6 +365,4 @@ public final class AiClient implements AiChatClient {
         }
     }
 
-    private record AttemptResult<T>(HttpResponse<T> response, int attempt, Duration duration) {
-    }
 }

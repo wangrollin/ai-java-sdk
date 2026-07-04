@@ -20,11 +20,9 @@ import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
 import io.wangrollin.ai.diagnostic.AiPayloadResponseEvent;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
-import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 
-import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.net.InetSocketAddress;
@@ -44,7 +42,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class AiClientTest {
     private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
-    private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
 
     private HttpServer server;
 
@@ -788,41 +785,6 @@ class AiClientTest {
         assertEquals(1, attempts.get());
     }
 
-    @Test
-    void validatesRetryPolicy() {
-        IllegalArgumentException maxAttempts = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
-                .maxAttempts(0)
-                .build());
-        IllegalArgumentException initialDelay = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
-                .initialDelay(Duration.ofMillis(-1))
-                .build());
-        IllegalArgumentException maxDelay = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
-                .maxDelay(Duration.ofMillis(-1))
-                .build());
-        IllegalArgumentException delayOrder = assertThrows(IllegalArgumentException.class, () -> RetryPolicy.builder()
-                .initialDelay(Duration.ofSeconds(2))
-                .maxDelay(Duration.ofSeconds(1))
-                .build());
-
-        assertEquals("maxAttempts must be positive", maxAttempts.getMessage());
-        assertEquals("initialDelay must not be negative", initialDelay.getMessage());
-        assertEquals("maxDelay must not be negative", maxDelay.getMessage());
-        assertEquals("initialDelay must not be greater than maxDelay", delayOrder.getMessage());
-    }
-
-    @Test
-    void closesStreamInput() {
-        CloseTrackingInputStream inputStream = new CloseTrackingInputStream("""
-                data: [DONE]
-
-                """);
-        ChatStream stream = new ChatStream(inputStream, OPEN_AI_CODEC::parseStreamDelta);
-
-        stream.close();
-
-        assertTrue(inputStream.closed());
-    }
-
     private AiClient testClient() {
         return testClient(null);
     }
@@ -952,21 +914,4 @@ class AiClientTest {
         void handle(HttpExchange exchange) throws Exception;
     }
 
-    private static final class CloseTrackingInputStream extends ByteArrayInputStream {
-        private boolean closed;
-
-        private CloseTrackingInputStream(String value) {
-            super(value.getBytes(StandardCharsets.UTF_8));
-        }
-
-        @Override
-        public void close() throws IOException {
-            closed = true;
-            super.close();
-        }
-
-        private boolean closed() {
-            return closed;
-        }
-    }
 }

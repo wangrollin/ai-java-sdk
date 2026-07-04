@@ -108,7 +108,16 @@ public final class RetryPolicy {
         return retryableStatusCodes.contains(statusCode);
     }
 
-    Duration delayForAttempt(int attemptNumber) {
+    /**
+     * Returns the backoff delay before the given attempt number.
+     *
+     * <p>Attempt {@code 1} is the original request and never waits. Attempts
+     * {@code 2+} use exponential backoff capped at {@link #maxDelay()}.
+     *
+     * @param attemptNumber one-based attempt number
+     * @return delay before that attempt
+     */
+    public Duration delayForAttempt(int attemptNumber) {
         if (attemptNumber <= 1 || initialDelay.isZero()) {
             return Duration.ZERO;
         }
