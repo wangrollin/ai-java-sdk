@@ -14,6 +14,7 @@ public record AiHttpRequestSpec(
         String requestDescription,
         String operation,
         String model,
+        String path,
         boolean stream,
         String payloadBody) {
     public AiHttpRequestSpec {
@@ -21,6 +22,7 @@ public record AiHttpRequestSpec(
         requestDescription = requireText(requestDescription, "requestDescription");
         operation = requireText(operation, "operation");
         model = requireText(model, "model");
+        path = requireText(path, "path");
         payloadBody = requireText(payloadBody, "payloadBody");
     }
 

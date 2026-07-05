@@ -1,0 +1,104 @@
+package io.wangrollin.ai.internal.openai;
+
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseRequest;
+import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseUsage;
+import org.junit.jupiter.api.Test;
+
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+
+class OpenAiResponseCodecTest {
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper();
+    private final OpenAiResponseCodec codec = new OpenAiResponseCodec();
+
+    @Test
+    void serializesResponseRequest() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .model("request-model")
+                .input("Hello")
+                .instructions("Answer briefly.")
+                .temperature(0.2)
+                .topP(0.9)
+                .maxOutputTokens(64)
+                .build(), "default-model", true);
+
+        JsonNode json = OBJECT_MAPPER.readTree(body);
+        assertEquals("request-model", json.path("model").asText());
+        assertEquals("Hello", json.path("input").asText());
+        assertEquals("Answer briefly.", json.path("instructions").asText());
+        assertEquals(0.2, json.path("temperature").asDouble());
+        assertEquals(0.9, json.path("top_p").asDouble());
+        assertEquals(64, json.path("max_output_tokens").asInt());
+        assertTrue(json.path("stream").asBoolean());
+    }
+
+    @Test
+    void parsesOutputTextAndUsage() {
+        ResponseResult result = codec.parseResponse("""
+                {
+                  "id": "resp_123",
+                  "model": "test-model",
+                  "status": "completed",
+                  "output_text": "Hello from responses",
+                  "usage": {
+                    "input_tokens": 2,
+                    "output_tokens": 3,
+                    "total_tokens": 5
+                  }
+                }
+                """);
+
+        assertEquals(new ResponseResult(
+                "Hello from responses",
+                "resp_123",
+                "test-model",
+                "completed",
+                new ResponseUsage(2, 3, 5)), result);
+    }
+
+    @Test
+    void fallsBackToOutputContentText() {
+        ResponseResult result = codec.parseResponse("""
+                {
+                  "output": [
+                    {
+                      "content": [
+                        {"type": "output_text", "text": "Hel"},
+                        {"type": "output_text", "text": "lo"}
+                      ]
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("Hello", result.text());
+    }
+
+    @Test
+    void rejectsMissingText() {
+        AiException exception = assertThrows(AiException.class, () -> codec.parseResponse("""
+                {"output":[]}
+                """));
+
+        assertEquals("Response did not contain output text", exception.getMessage());
+    }
+
+    @Test
+    void parsesStreamDeltaAndCompletion() {
+        assertEquals(new ResponseDelta("Hel", false), codec.parseStreamDelta("""
+                {"type":"response.output_text.delta","delta":"Hel"}
+                """));
+        assertEquals(new ResponseDelta("", true), codec.parseStreamDelta("""
+                {"type":"response.completed"}
+                """));
+        assertEquals(new ResponseDelta("", false), codec.parseStreamDelta("""
+                {"type":"response.created"}
+                """));
+    }
+}

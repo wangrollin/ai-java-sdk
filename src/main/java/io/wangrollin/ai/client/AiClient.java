@@ -12,6 +12,10 @@ import io.wangrollin.ai.internal.http.AiHttpExecutor;
 import io.wangrollin.ai.internal.http.AiHttpRequestSpec;
 import io.wangrollin.ai.internal.http.AiHttpResult;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
+import io.wangrollin.ai.internal.openai.OpenAiResponseCodec;
+import io.wangrollin.ai.response.ResponseRequest;
+import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseStream;
 
 import java.io.InputStream;
 import java.net.URI;
@@ -29,7 +33,7 @@ import java.util.Objects;
  * details stay inside the internal OpenAI adapter so application code can
  * depend on the smaller {@link AiChatClient} contract where possible.
  */
-public final class AiClient implements AiChatClient {
+public final class AiClient implements AiChatClient, AiResponseClient {
     /**
      * Default OpenAI-compatible API base URL.
      */
@@ -41,6 +45,9 @@ public final class AiClient implements AiChatClient {
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
     private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
+    private static final OpenAiResponseCodec OPEN_AI_RESPONSE_CODEC = new OpenAiResponseCodec();
+    private static final String CHAT_PATH = "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH;
+    private static final String RESPONSES_PATH = "/" + OpenAiResponseCodec.RESPONSES_PATH;
 
     private final String apiKey;
     private final URI baseUri;
@@ -73,8 +80,7 @@ public final class AiClient implements AiChatClient {
                 eventListener,
                 payloadDiagnosticsListener,
                 redactionPolicy,
-                baseUri,
-                "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
+                baseUri);
     }
 
     /**
@@ -103,21 +109,43 @@ public final class AiClient implements AiChatClient {
                 "chat request",
                 "chat",
                 model,
+                CHAT_PATH,
                 false,
                 requestBody), HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
-            httpExecutor.emitPayloadFailure("chat", model, false, response.statusCode(), response.body());
+            httpExecutor.emitPayloadFailure(
+                    "chat",
+                    model,
+                    CHAT_PATH,
+                    false,
+                    response.statusCode(),
+                    response.body());
             AiException exception = providerResponseException("Chat request", response.statusCode(), response.body());
-            httpExecutor.emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), exception);
+            httpExecutor.emitFailure(
+                    "chat",
+                    model,
+                    CHAT_PATH,
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    exception);
             throw exception;
         }
         try {
-            httpExecutor.emitPayloadResponse("chat", model, false, response.statusCode(), response.body());
+            httpExecutor.emitPayloadResponse(
+                    "chat",
+                    model,
+                    CHAT_PATH,
+                    false,
+                    response.statusCode(),
+                    response.body());
             ChatResponse chatResponse = OPEN_AI_CODEC.parseResponse(response.body());
             httpExecutor.emitSuccess(
                     "chat",
                     eventModel(model, chatResponse.model()),
+                    CHAT_PATH,
                     false,
                     result.attempt(),
                     response.statusCode(),
@@ -126,7 +154,15 @@ public final class AiClient implements AiChatClient {
                     chatResponse.usage());
             return chatResponse;
         } catch (AiException e) {
-            httpExecutor.emitFailure("chat", model, false, result.attempt(), response.statusCode(), result.duration(), e);
+            httpExecutor.emitFailure(
+                    "chat",
+                    model,
+                    CHAT_PATH,
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    e);
             throw e;
         }
     }
@@ -149,20 +185,44 @@ public final class AiClient implements AiChatClient {
                 "streaming chat request",
                 "stream",
                 model,
+                CHAT_PATH,
                 true,
                 requestBody), HttpResponse.BodyHandlers.ofInputStream());
         HttpResponse<InputStream> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String errorBody = AiHttpExecutor.readBody(response.body());
-            httpExecutor.emitPayloadFailure("stream", model, true, response.statusCode(), errorBody);
+            httpExecutor.emitPayloadFailure(
+                    "stream",
+                    model,
+                    CHAT_PATH,
+                    true,
+                    response.statusCode(),
+                    errorBody);
             AiException exception = providerResponseException(
                     "Streaming chat request",
                     response.statusCode(),
                     errorBody);
-            httpExecutor.emitFailure("stream", model, true, result.attempt(), response.statusCode(), result.duration(), exception);
+            httpExecutor.emitFailure(
+                    "stream",
+                    model,
+                    CHAT_PATH,
+                    true,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    exception);
             throw exception;
         }
-        httpExecutor.emitSuccess("stream", model, true, result.attempt(), response.statusCode(), result.duration(), null, null);
+        httpExecutor.emitSuccess(
+                "stream",
+                model,
+                CHAT_PATH,
+                true,
+                result.attempt(),
+                response.statusCode(),
+                result.duration(),
+                null,
+                null);
         long streamOpenNanos = System.nanoTime();
         return new ChatStream(
                 response.body(),
@@ -170,6 +230,7 @@ public final class AiClient implements AiChatClient {
                 failure -> httpExecutor.emitFailure(
                         "stream",
                         model,
+                        CHAT_PATH,
                         true,
                         result.attempt(),
                         response.statusCode(),
@@ -181,7 +242,161 @@ public final class AiClient implements AiChatClient {
         return baseUri.resolve(OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
     }
 
+    @Override
+    public ResponseResult respond(ResponseRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        String model = responseModelFor(request);
+        String requestBody = OPEN_AI_RESPONSE_CODEC.serializeRequest(request, defaultModel, false);
+        HttpRequest httpRequest = HttpRequest.newBuilder(responsesUri())
+                .timeout(timeout)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
+                httpRequest,
+                "response request",
+                "response",
+                model,
+                RESPONSES_PATH,
+                false,
+                requestBody), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = result.response();
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            httpExecutor.emitPayloadFailure(
+                    "response",
+                    model,
+                    RESPONSES_PATH,
+                    false,
+                    response.statusCode(),
+                    response.body());
+            AiException exception = providerResponseException("Response request", response.statusCode(), response.body());
+            httpExecutor.emitFailure(
+                    "response",
+                    model,
+                    RESPONSES_PATH,
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    exception);
+            throw exception;
+        }
+        try {
+            httpExecutor.emitPayloadResponse(
+                    "response",
+                    model,
+                    RESPONSES_PATH,
+                    false,
+                    response.statusCode(),
+                    response.body());
+            ResponseResult responseResult = OPEN_AI_RESPONSE_CODEC.parseResponse(response.body());
+            httpExecutor.emitSuccess(
+                    "response",
+                    responseResult.model() == null ? model : responseResult.model(),
+                    RESPONSES_PATH,
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    responseResult.status(),
+                    null);
+            return responseResult;
+        } catch (AiException e) {
+            httpExecutor.emitFailure(
+                    "response",
+                    model,
+                    RESPONSES_PATH,
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    e);
+            throw e;
+        }
+    }
+
+    @Override
+    public ResponseStream streamResponse(ResponseRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        String model = responseModelFor(request);
+        String requestBody = OPEN_AI_RESPONSE_CODEC.serializeRequest(request, defaultModel, true);
+        HttpRequest httpRequest = HttpRequest.newBuilder(responsesUri())
+                .timeout(timeout)
+                .header("Authorization", "Bearer " + apiKey)
+                .header("Content-Type", "application/json")
+                .header("Accept", "text/event-stream")
+                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .build();
+
+        AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
+                httpRequest,
+                "streaming response request",
+                "response.stream",
+                model,
+                RESPONSES_PATH,
+                true,
+                requestBody), HttpResponse.BodyHandlers.ofInputStream());
+        HttpResponse<InputStream> response = result.response();
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            String errorBody = AiHttpExecutor.readBody(response.body());
+            httpExecutor.emitPayloadFailure(
+                    "response.stream",
+                    model,
+                    RESPONSES_PATH,
+                    true,
+                    response.statusCode(),
+                    errorBody);
+            AiException exception = providerResponseException(
+                    "Streaming response request",
+                    response.statusCode(),
+                    errorBody);
+            httpExecutor.emitFailure(
+                    "response.stream",
+                    model,
+                    RESPONSES_PATH,
+                    true,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    exception);
+            throw exception;
+        }
+        httpExecutor.emitSuccess(
+                "response.stream",
+                model,
+                RESPONSES_PATH,
+                true,
+                result.attempt(),
+                response.statusCode(),
+                result.duration(),
+                null,
+                null);
+        long streamOpenNanos = System.nanoTime();
+        return new ResponseStream(
+                response.body(),
+                OPEN_AI_RESPONSE_CODEC::parseStreamDelta,
+                failure -> httpExecutor.emitFailure(
+                        "response.stream",
+                        model,
+                        RESPONSES_PATH,
+                        true,
+                        result.attempt(),
+                        response.statusCode(),
+                        result.duration().plus(AiHttpExecutor.elapsedSince(streamOpenNanos)),
+                        failure));
+    }
+
+    private URI responsesUri() {
+        return baseUri.resolve(OpenAiResponseCodec.RESPONSES_PATH);
+    }
+
     private String modelFor(ChatRequest request) {
+        return request.model() == null ? defaultModel : request.model();
+    }
+
+    private String responseModelFor(ResponseRequest request) {
         return request.model() == null ? defaultModel : request.model();
     }
 

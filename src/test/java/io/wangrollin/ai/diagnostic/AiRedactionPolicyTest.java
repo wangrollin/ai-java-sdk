@@ -30,7 +30,9 @@ class AiRedactionPolicyTest {
                   "error": {
                     "message": "raw provider detail",
                     "code": "rate_limit"
-                  }
+                  },
+                  "input": "secret response input",
+                  "output_text": "secret response output"
                 }
                 """);
 
@@ -38,6 +40,8 @@ class AiRedactionPolicyTest {
         assertFalse(redacted.contains("secret prompt"));
         assertFalse(redacted.contains("Shanghai"));
         assertFalse(redacted.contains("raw provider detail"));
+        assertFalse(redacted.contains("secret response input"));
+        assertFalse(redacted.contains("secret response output"));
         assertTrue(redacted.contains("<redacted>"));
         assertTrue(redacted.contains("lookup_weather"));
         assertTrue(redacted.contains("rate_limit"));

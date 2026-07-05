@@ -125,8 +125,7 @@ class AiHttpExecutorTest {
                 eventListener,
                 diagnosticsListener,
                 AiRedactionPolicy.defaultPolicy(),
-                BASE_URI,
-                PATH);
+                BASE_URI);
     }
 
     private static RetryPolicy retryPolicy(int maxAttempts) {
@@ -147,6 +146,7 @@ class AiHttpExecutorTest {
                 "chat request",
                 "chat",
                 "test-model",
+                PATH,
                 false,
                 "{\"messages\":[{\"content\":\"secret prompt\"}]}");
     }

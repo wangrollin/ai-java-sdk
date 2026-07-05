@@ -36,7 +36,6 @@ public final class AiHttpExecutor {
     private final AiPayloadDiagnosticsListener payloadDiagnosticsListener;
     private final AiRedactionPolicy redactionPolicy;
     private final URI baseUri;
-    private final String path;
 
     public AiHttpExecutor(
             HttpClient httpClient,
@@ -44,8 +43,7 @@ public final class AiHttpExecutor {
             AiEventListener eventListener,
             AiPayloadDiagnosticsListener payloadDiagnosticsListener,
             AiRedactionPolicy redactionPolicy,
-            URI baseUri,
-            String path) {
+            URI baseUri) {
         this.httpClient = Objects.requireNonNull(httpClient, "httpClient must not be null");
         this.retryPolicy = Objects.requireNonNull(retryPolicy, "retryPolicy must not be null");
         this.eventListener = Objects.requireNonNull(eventListener, "eventListener must not be null");
@@ -54,16 +52,15 @@ public final class AiHttpExecutor {
                 "payloadDiagnosticsListener must not be null");
         this.redactionPolicy = Objects.requireNonNull(redactionPolicy, "redactionPolicy must not be null");
         this.baseUri = Objects.requireNonNull(baseUri, "baseUri must not be null");
-        this.path = requireText(path, "path");
     }
 
     public <T> AiHttpResult<T> send(AiHttpRequestSpec spec, HttpResponse.BodyHandler<T> bodyHandler) {
         Objects.requireNonNull(spec, "spec must not be null");
         Objects.requireNonNull(bodyHandler, "bodyHandler must not be null");
-        emitPayloadRequest(spec.operation(), spec.model(), spec.stream(), spec.payloadBody());
+        emitPayloadRequest(spec.operation(), spec.model(), spec.path(), spec.stream(), spec.payloadBody());
         for (int attempt = 1; attempt <= retryPolicy.maxAttempts(); attempt++) {
             sleepBeforeRetry(attempt, spec.requestDescription());
-            emitStarted(spec.operation(), spec.model(), spec.stream(), attempt);
+            emitStarted(spec.operation(), spec.model(), spec.path(), spec.stream(), attempt);
             long startNanos = System.nanoTime();
             try {
                 HttpResponse<T> response = httpClient.send(spec.request(), bodyHandler);
@@ -71,10 +68,17 @@ public final class AiHttpExecutor {
                 if (!shouldRetryResponse(response.statusCode(), attempt)) {
                     return new AiHttpResult<>(response, attempt, duration);
                 }
-                emitRetriedPayloadFailure(spec.operation(), spec.model(), spec.stream(), response.statusCode(), response.body());
+                emitRetriedPayloadFailure(
+                        spec.operation(),
+                        spec.model(),
+                        spec.path(),
+                        spec.stream(),
+                        response.statusCode(),
+                        response.body());
                 emitFailure(
                         spec.operation(),
                         spec.model(),
+                        spec.path(),
                         spec.stream(),
                         attempt,
                         response.statusCode(),
@@ -84,7 +88,7 @@ public final class AiHttpExecutor {
             } catch (IOException e) {
                 Duration duration = elapsedSince(startNanos);
                 AiException exception = new AiException("Failed to send " + spec.requestDescription(), e);
-                emitFailure(spec.operation(), spec.model(), spec.stream(), attempt, null, duration, exception);
+                emitFailure(spec.operation(), spec.model(), spec.path(), spec.stream(), attempt, null, duration, exception);
                 if (attempt == retryPolicy.maxAttempts()) {
                     throw exception;
                 }
@@ -92,7 +96,7 @@ public final class AiHttpExecutor {
                 Duration duration = elapsedSince(startNanos);
                 Thread.currentThread().interrupt();
                 AiException exception = new AiException(capitalize(spec.requestDescription()) + " was interrupted", e);
-                emitFailure(spec.operation(), spec.model(), spec.stream(), attempt, null, duration, exception);
+                emitFailure(spec.operation(), spec.model(), spec.path(), spec.stream(), attempt, null, duration, exception);
                 throw exception;
             }
         }
@@ -102,6 +106,7 @@ public final class AiHttpExecutor {
     public void emitSuccess(
             String operation,
             String model,
+            String path,
             boolean stream,
             int attempt,
             int statusCode,
@@ -124,6 +129,7 @@ public final class AiHttpExecutor {
     public void emitFailure(
             String operation,
             String model,
+            String path,
             boolean stream,
             int attempt,
             Integer statusCode,
@@ -142,7 +148,7 @@ public final class AiHttpExecutor {
                 safeMessage(exception)));
     }
 
-    public void emitPayloadResponse(String operation, String model, boolean stream, int statusCode, String body) {
+    public void emitPayloadResponse(String operation, String model, String path, boolean stream, int statusCode, String body) {
         if (!payloadDiagnosticsEnabled()) {
             return;
         }
@@ -156,7 +162,7 @@ public final class AiHttpExecutor {
                 redactionPolicy.redactJson(body)));
     }
 
-    public void emitPayloadFailure(String operation, String model, boolean stream, int statusCode, String body) {
+    public void emitPayloadFailure(String operation, String model, String path, boolean stream, int statusCode, String body) {
         if (!payloadDiagnosticsEnabled()) {
             return;
         }
@@ -182,11 +188,11 @@ public final class AiHttpExecutor {
         return Duration.ofNanos(System.nanoTime() - startNanos);
     }
 
-    private void emitStarted(String operation, String model, boolean stream, int attempt) {
+    private void emitStarted(String operation, String model, String path, boolean stream, int attempt) {
         eventListener.requestStarted(new AiRequestEvent(operation, model, baseUri, path, stream, attempt));
     }
 
-    private void emitPayloadRequest(String operation, String model, boolean stream, String body) {
+    private void emitPayloadRequest(String operation, String model, String path, boolean stream, String body) {
         if (!payloadDiagnosticsEnabled()) {
             return;
         }
@@ -199,16 +205,22 @@ public final class AiHttpExecutor {
                 redactionPolicy.redactJson(body)));
     }
 
-    private void emitRetriedPayloadFailure(String operation, String model, boolean stream, int statusCode, Object body) {
+    private void emitRetriedPayloadFailure(
+            String operation,
+            String model,
+            String path,
+            boolean stream,
+            int statusCode,
+            Object body) {
         if (!payloadDiagnosticsEnabled()) {
             return;
         }
         if (body instanceof InputStream inputStream) {
-            emitPayloadFailure(operation, model, stream, statusCode, readBody(inputStream));
+            emitPayloadFailure(operation, model, path, stream, statusCode, readBody(inputStream));
             return;
         }
         if (body instanceof String text) {
-            emitPayloadFailure(operation, model, stream, statusCode, text);
+            emitPayloadFailure(operation, model, path, stream, statusCode, text);
         }
     }
 

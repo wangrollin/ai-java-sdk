@@ -71,6 +71,7 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 ```java
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.event.AiEventListener;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.chat.ChatDelta;
@@ -87,6 +88,10 @@ import io.wangrollin.ai.event.AiMetricsSnapshot;
 import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
 import io.wangrollin.ai.client.RetryPolicy;
+import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseRequest;
+import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseStream;
 
 import java.time.Duration;
 
@@ -319,6 +324,42 @@ AiClient client = AiClient.builder()
 
 Streaming requests only retry failures that happen before a successful response stream is returned. Once stream consumption begins, malformed events or read failures are surfaced to the caller without replaying the request.
 
+## Responses API
+
+The SDK also includes a text-first OpenAI-compatible Responses API client. It reuses the same
+timeouts, retry policy, safe lifecycle events, metrics listener, and redacted payload diagnostics as
+chat completions.
+
+```java
+AiResponseClient responseClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .build();
+
+ResponseResult result = responseClient.respond(ResponseRequest.builder()
+    .instructions("Answer with concise engineering guidance.")
+    .input("How should I prepare an AI SDK for production?")
+    .build());
+
+System.out.println(result.text());
+```
+
+For streaming output, consume `ResponseStream` with try-with-resources:
+
+```java
+try (ResponseStream stream = responseClient.streamResponse(ResponseRequest.builder()
+    .input("Give me two short rollout checks.")
+    .build())) {
+    for (ResponseDelta delta : stream) {
+        System.out.print(delta.text());
+    }
+}
+```
+
+This first Responses API surface intentionally focuses on text input and output. Advanced provider
+features such as image/file input, tool execution, background mode, and stored conversation
+management are left for later milestones.
+
 ## Testing Support
 
 Application code can depend on the `AiChatClient` interface and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
@@ -360,6 +401,7 @@ Small, compilable examples live in `src/examples/java/io/wangrollin/ai/examples`
 
 - `BasicChatExample` sends a synchronous chat request.
 - `StreamingChatExample` consumes incremental streaming deltas.
+- `ResponsesExample` sends synchronous and streaming text-first Responses API requests.
 - `ToolCallingExample` shows provider tool-call plumbing while application code executes the tool.
 - `MetricsListenerExample` collects safe request metrics from lifecycle events.
 - `PayloadDiagnosticsExample` enables opt-in redacted payload diagnostics.

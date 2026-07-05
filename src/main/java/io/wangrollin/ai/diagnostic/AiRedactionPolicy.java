@@ -31,7 +31,11 @@ public final class AiRedactionPolicy {
             "secret",
             "content",
             "arguments",
-            "message");
+            "message",
+            "input",
+            "instructions",
+            "output_text",
+            "text");
 
     private AiRedactionPolicy() {
     }
