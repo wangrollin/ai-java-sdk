@@ -101,4 +101,14 @@ class OpenAiResponseCodecTest {
                 {"type":"response.created"}
                 """));
     }
+
+    @Test
+    void serializesFakeStreamDeltas() {
+        assertEquals(
+                new ResponseDelta("Hel", false),
+                codec.parseStreamDelta(codec.serializeStreamDelta(new ResponseDelta("Hel", false))));
+        assertEquals(
+                new ResponseDelta("", true),
+                codec.parseStreamDelta(codec.serializeStreamDelta(new ResponseDelta("", true))));
+    }
 }

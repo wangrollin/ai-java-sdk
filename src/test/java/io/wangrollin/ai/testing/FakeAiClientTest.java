@@ -8,6 +8,11 @@ import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
 import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseRequest;
+import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseStream;
+import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.Test;
 
 import java.util.ArrayList;
@@ -72,20 +77,85 @@ class FakeAiClientTest {
     }
 
     @Test
+    void returnsConfiguredResponseResultsInOrderAndRecordsRequests() {
+        ResponseResult secondResult = new ResponseResult(
+                "second",
+                "resp-2",
+                "model-2",
+                "completed",
+                new ResponseUsage(2, 3, 5));
+        FakeAiClient client = FakeAiClient.builder()
+                .responseResult("first")
+                .responseResult(secondResult)
+                .build();
+
+        ResponseRequest firstRequest = ResponseRequest.builder()
+                .input("First")
+                .build();
+        ResponseRequest secondRequest = ResponseRequest.builder()
+                .model("override-model")
+                .instructions("Answer briefly.")
+                .input("Second")
+                .build();
+
+        assertEquals("first", client.respond(firstRequest).text());
+        ResponseResult response = client.respond(secondRequest);
+
+        assertEquals(secondResult, response);
+        assertEquals(List.of(firstRequest, secondRequest), client.responseRequests());
+        assertEquals("override-model", client.responseRequests().get(1).model());
+    }
+
+    @Test
+    void returnsConfiguredResponseStreamDeltas() {
+        FakeAiClient client = FakeAiClient.builder()
+                .responseStreamDeltas(
+                        new ResponseDelta("Hel", false),
+                        new ResponseDelta("lo", false),
+                        new ResponseDelta("", true))
+                .build();
+
+        List<ResponseDelta> deltas = new ArrayList<>();
+        try (ResponseStream stream = client.streamResponse(ResponseRequest.builder()
+                .input("Hello")
+                .build())) {
+            for (ResponseDelta delta : stream) {
+                deltas.add(delta);
+            }
+        }
+
+        assertEquals(List.of(
+                new ResponseDelta("Hel", false),
+                new ResponseDelta("lo", false)), deltas);
+    }
+
+    @Test
     void propagatesConfiguredFailures() {
         AiException chatFailure = new AiException("chat failed");
         AiException streamFailure = new AiException("stream failed");
+        AiException responseFailure = new AiException("response failed");
+        AiException responseStreamFailure = new AiException("response stream failed");
         FakeAiClient client = FakeAiClient.builder()
                 .chatFailure(chatFailure)
                 .streamFailure(streamFailure)
+                .responseFailure(responseFailure)
+                .responseStreamFailure(responseStreamFailure)
                 .build();
         ChatRequest request = ChatRequest.builder()
                 .message(ChatMessage.user("Hello"))
                 .build();
+        ResponseRequest responseRequest = ResponseRequest.builder()
+                .input("Hello")
+                .build();
 
         assertEquals(chatFailure, assertThrows(AiException.class, () -> client.chat(request)));
         assertEquals(streamFailure, assertThrows(AiException.class, () -> client.stream(request)));
+        assertEquals(responseFailure, assertThrows(AiException.class, () -> client.respond(responseRequest)));
+        assertEquals(
+                responseStreamFailure,
+                assertThrows(AiException.class, () -> client.streamResponse(responseRequest)));
         assertEquals(List.of(request, request), client.requests());
+        assertEquals(List.of(responseRequest, responseRequest), client.responseRequests());
     }
 
     @Test
@@ -104,6 +174,21 @@ class FakeAiClientTest {
     }
 
     @Test
+    void canReturnMalformedResponseStreamEventsForConsumerFailureTests() {
+        FakeAiClient client = FakeAiClient.builder()
+                .responseStreamMalformedEvent("{\"type\":")
+                .build();
+
+        try (ResponseStream stream = client.streamResponse(ResponseRequest.builder()
+                .input("Hello")
+                .build())) {
+            AiException exception = assertThrows(AiException.class, () -> stream.iterator().hasNext());
+
+            assertEquals("Failed to parse response stream event", exception.getMessage());
+        }
+    }
+
+    @Test
     void throwsClearErrorWhenNoOutcomeIsConfigured() {
         FakeAiClient client = FakeAiClient.builder().build();
         ChatRequest request = ChatRequest.builder()
@@ -112,9 +197,18 @@ class FakeAiClientTest {
 
         AiException chatException = assertThrows(AiException.class, () -> client.chat(request));
         AiException streamException = assertThrows(AiException.class, () -> client.stream(request));
+        ResponseRequest responseRequest = ResponseRequest.builder()
+                .input("Hello")
+                .build();
+        AiException responseException = assertThrows(AiException.class, () -> client.respond(responseRequest));
+        AiException responseStreamException = assertThrows(
+                AiException.class,
+                () -> client.streamResponse(responseRequest));
 
         assertEquals("No fake chat response configured", chatException.getMessage());
         assertEquals("No fake stream response configured", streamException.getMessage());
+        assertEquals("No fake response result configured", responseException.getMessage());
+        assertEquals("No fake response stream configured", responseStreamException.getMessage());
     }
 
     @Test
@@ -129,5 +223,19 @@ class FakeAiClientTest {
 
         assertThrows(UnsupportedOperationException.class, () -> client.requests().clear());
         assertEquals(1, client.requests().size());
+    }
+
+    @Test
+    void responseRequestHistoryCannotBeMutatedByCallers() {
+        FakeAiClient client = FakeAiClient.builder()
+                .responseResult("ok")
+                .build();
+
+        client.respond(ResponseRequest.builder()
+                .input("Hello")
+                .build());
+
+        assertThrows(UnsupportedOperationException.class, () -> client.responseRequests().clear());
+        assertEquals(1, client.responseRequests().size());
     }
 }

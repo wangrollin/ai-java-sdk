@@ -82,6 +82,25 @@ public final class OpenAiResponseCodec {
         }
     }
 
+    /**
+     * Serializes a fake stream delta using the same event shape consumed by the parser.
+     *
+     * @param delta delta to encode
+     * @return JSON SSE data value
+     */
+    public String serializeStreamDelta(ResponseDelta delta) {
+        try {
+            if (delta.done()) {
+                return objectMapper.writeValueAsString(Map.of("type", "response.completed"));
+            }
+            return objectMapper.writeValueAsString(Map.of(
+                    "type", "response.output_text.delta",
+                    "delta", delta.text()));
+        } catch (JsonProcessingException e) {
+            throw new AiException("Failed to serialize fake response stream event", e);
+        }
+    }
+
     private Map<String, Object> payload(ResponseRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
         Map<String, Object> payload = new LinkedHashMap<>();

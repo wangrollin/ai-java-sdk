@@ -362,28 +362,37 @@ management are left for later milestones.
 
 ## Testing Support
 
-Application code can depend on the `AiChatClient` interface and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
+Application code can depend on the `AiChatClient` or `AiResponseClient` interfaces and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
 
 ```java
 import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.chat.ChatDelta;
 import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
+import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.testing.FakeAiClient;
 
-AiChatClient client = FakeAiClient.builder()
+FakeAiClient fake = FakeAiClient.builder()
     .chatResponse("Test response")
     .streamDeltas(
         new ChatDelta("Hel", null),
         new ChatDelta("lo", "stop"))
+    .responseResult("Responses test result")
     .build();
+AiChatClient client = fake;
+AiResponseClient responseClient = fake;
 
 String text = client.chat(ChatRequest.builder()
     .message(ChatMessage.user("Hello"))
     .build()).text();
+
+String responseText = responseClient.respond(ResponseRequest.builder()
+    .input("Hello")
+    .build()).text();
 ```
 
-`FakeAiClient` can also be configured with failures through `chatFailure(...)`, `streamFailure(...)`, and `streamMalformedEvent(...)`, which is useful for testing retry wrappers, fallback behavior, and stream-consumption error handling in application code without calling a real provider.
+`FakeAiClient` can also be configured with failures through `chatFailure(...)`, `streamFailure(...)`, `streamMalformedEvent(...)`, `responseFailure(...)`, `responseStreamFailure(...)`, and `responseStreamMalformedEvent(...)`, which is useful for testing retry wrappers, fallback behavior, and stream-consumption error handling in application code without calling a real provider.
 
 Run the test suite with:
 
