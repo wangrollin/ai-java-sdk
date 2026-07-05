@@ -6,6 +6,7 @@ import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseTextFormat;
 import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.Test;
 
@@ -36,6 +37,46 @@ class OpenAiResponseCodecTest {
         assertEquals(0.9, json.path("top_p").asDouble());
         assertEquals(64, json.path("max_output_tokens").asInt());
         assertTrue(json.path("stream").asBoolean());
+    }
+
+    @Test
+    void serializesResponseTextJsonSchemaFormat() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .input("Summarize risk")
+                .textFormat(ResponseTextFormat.jsonSchema(
+                        "risk_summary",
+                        "Risk summary response",
+                        """
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "risk": { "type": "string" }
+                                  },
+                                  "required": ["risk"],
+                                  "additionalProperties": false
+                                }
+                                """,
+                        true))
+                .build(), "default-model", false);
+
+        JsonNode format = OBJECT_MAPPER.readTree(body).path("text").path("format");
+        assertEquals("json_schema", format.path("type").asText());
+        assertEquals("risk_summary", format.path("name").asText());
+        assertEquals("Risk summary response", format.path("description").asText());
+        assertEquals("object", format.path("schema").path("type").asText());
+        assertEquals("risk", format.path("schema").path("required").path(0).asText());
+        assertTrue(format.path("strict").asBoolean());
+    }
+
+    @Test
+    void serializesResponseTextJsonObjectFormat() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .input("Return JSON")
+                .textFormat(ResponseTextFormat.jsonObject())
+                .build(), "default-model", false);
+
+        JsonNode format = OBJECT_MAPPER.readTree(body).path("text").path("format");
+        assertEquals("json_object", format.path("type").asText());
     }
 
     @Test

@@ -92,6 +92,7 @@ import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
+import io.wangrollin.ai.response.ResponseTextFormat;
 
 import java.time.Duration;
 
@@ -342,6 +343,27 @@ ResponseResult result = responseClient.respond(ResponseRequest.builder()
     .build());
 
 System.out.println(result.text());
+```
+
+Structured JSON output can be requested through the Responses API `text.format` field. The SDK
+validates JSON Schema text before sending it and still returns the provider output as
+`ResponseResult.text()` so application code can parse it into its own domain type.
+
+```java
+ResponseResult structured = responseClient.respond(ResponseRequest.builder()
+    .input("Summarize this launch risk in one JSON object.")
+    .textFormat(ResponseTextFormat.jsonSchema("risk_summary", """
+        {
+          "type": "object",
+          "properties": {
+            "risk": { "type": "string", "enum": ["low", "medium", "high"] },
+            "summary": { "type": "string" }
+          },
+          "required": ["risk", "summary"],
+          "additionalProperties": false
+        }
+        """))
+    .build());
 ```
 
 For streaming output, consume `ResponseStream` with try-with-resources:

@@ -10,6 +10,7 @@ public final class ResponseRequest {
     private final Double temperature;
     private final Double topP;
     private final Integer maxOutputTokens;
+    private final ResponseTextFormat textFormat;
 
     private ResponseRequest(Builder builder) {
         this.model = normalizeOptionalText(builder.model);
@@ -18,6 +19,7 @@ public final class ResponseRequest {
         this.temperature = requireNonNegative(builder.temperature, "temperature");
         this.topP = requireNonNegative(builder.topP, "topP");
         this.maxOutputTokens = requirePositive(builder.maxOutputTokens, "maxOutputTokens");
+        this.textFormat = builder.textFormat;
     }
 
     /**
@@ -53,6 +55,10 @@ public final class ResponseRequest {
         return maxOutputTokens;
     }
 
+    public ResponseTextFormat textFormat() {
+        return textFormat;
+    }
+
     /**
      * Builder for {@link ResponseRequest}.
      */
@@ -63,6 +69,7 @@ public final class ResponseRequest {
         private Double temperature;
         private Double topP;
         private Integer maxOutputTokens;
+        private ResponseTextFormat textFormat;
 
         private Builder() {
         }
@@ -134,6 +141,17 @@ public final class ResponseRequest {
         }
 
         /**
+         * Sets the provider text format for structured Responses API output.
+         *
+         * @param textFormat text format hint to send
+         * @return this builder
+         */
+        public Builder textFormat(ResponseTextFormat textFormat) {
+            this.textFormat = requireNonNull(textFormat, "textFormat");
+            return this;
+        }
+
+        /**
          * Builds the immutable request after validating required fields.
          *
          * @return response request
@@ -179,6 +197,13 @@ public final class ResponseRequest {
         }
         if (value < 1) {
             throw new IllegalArgumentException(name + " must be positive");
+        }
+        return value;
+    }
+
+    private static <T> T requireNonNull(T value, String name) {
+        if (value == null) {
+            throw new IllegalArgumentException(name + " must not be null");
         }
         return value;
     }

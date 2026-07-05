@@ -7,6 +7,7 @@ import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.response.ResponseTextFormat;
 import io.wangrollin.ai.response.ResponseUsage;
 
 import java.util.LinkedHashMap;
@@ -110,10 +111,41 @@ public final class OpenAiResponseCodec {
         putIfPresent(payload, "temperature", request.temperature());
         putIfPresent(payload, "top_p", request.topP());
         putIfPresent(payload, "max_output_tokens", request.maxOutputTokens());
+        putIfPresent(payload, "text", textPayload(request.textFormat()));
         if (stream) {
             payload.put("stream", true);
         }
         return payload;
+    }
+
+    private Map<String, Object> textPayload(ResponseTextFormat textFormat) {
+        if (textFormat == null) {
+            return null;
+        }
+        return Map.of("format", textFormatPayload(textFormat));
+    }
+
+    private Map<String, Object> textFormatPayload(ResponseTextFormat textFormat) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", textFormat.type());
+        putIfPresent(payload, "name", textFormat.jsonSchemaName());
+        putIfPresent(payload, "description", textFormat.jsonSchemaDescription());
+        putIfPresent(payload, "schema", parseJsonObject(textFormat.jsonSchema()));
+        if ("json_schema".equals(textFormat.type())) {
+            payload.put("strict", textFormat.strict());
+        }
+        return payload;
+    }
+
+    private JsonNode parseJsonObject(String json) {
+        if (json == null) {
+            return null;
+        }
+        try {
+            return objectMapper.readTree(json);
+        } catch (JsonProcessingException e) {
+            throw new AiException("Failed to serialize response text format", e);
+        }
     }
 
     private static String outputText(JsonNode root) {

@@ -12,6 +12,7 @@ import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
+import io.wangrollin.ai.response.ResponseTextFormat;
 import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.Test;
 
@@ -96,6 +97,7 @@ class FakeAiClientTest {
                 .model("override-model")
                 .instructions("Answer briefly.")
                 .input("Second")
+                .textFormat(ResponseTextFormat.jsonObject())
                 .build();
 
         assertEquals("first", client.respond(firstRequest).text());
@@ -104,6 +106,7 @@ class FakeAiClientTest {
         assertEquals(secondResult, response);
         assertEquals(List.of(firstRequest, secondRequest), client.responseRequests());
         assertEquals("override-model", client.responseRequests().get(1).model());
+        assertEquals(ResponseTextFormat.jsonObject(), client.responseRequests().get(1).textFormat());
     }
 
     @Test

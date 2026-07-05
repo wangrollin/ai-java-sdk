@@ -13,6 +13,7 @@ import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
+import io.wangrollin.ai.response.ResponseTextFormat;
 import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -103,6 +104,37 @@ class AiResponseClientTest {
                 .build());
 
         assertEquals("request-model", OBJECT_MAPPER.readTree(captured.get().body()).path("model").asText());
+    }
+
+    @Test
+    void sendsResponseStructuredOutputFormat() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"output_text":"{\\"risk\\":\\"low\\"}"}
+                    """);
+        });
+
+        testClient().respond(ResponseRequest.builder()
+                .input("Summarize risk")
+                .textFormat(ResponseTextFormat.jsonSchema("risk_summary", """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "risk": { "type": "string" }
+                          },
+                          "required": ["risk"],
+                          "additionalProperties": false
+                        }
+                        """))
+                .build());
+
+        JsonNode format = OBJECT_MAPPER.readTree(captured.get().body()).path("text").path("format");
+        assertEquals("json_schema", format.path("type").asText());
+        assertEquals("risk_summary", format.path("name").asText());
+        assertEquals("object", format.path("schema").path("type").asText());
+        assertTrue(format.path("strict").asBoolean());
     }
 
     @Test
