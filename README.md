@@ -390,7 +390,7 @@ injection for the default SDK client:
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-spring-boot-starter</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
