@@ -23,31 +23,58 @@ AI APIs are easy to call once, but harder to operate well in a Java backend. Pro
 - **Operational visibility**: make logging, tracing, metrics, and request diagnostics easier to add safely.
 - **Framework integration**: provide a path toward Spring Boot-friendly configuration and dependency injection.
 
-## Initial Design Goals
+## Completed Foundation
 
-The initial version is designed around a small, reliable foundation:
+The v0.1.0 release includes the small, reliable foundation originally planned for the first
+implementation milestone:
 
-- A minimal chat API for synchronous responses.
-- A streaming API for incremental model output.
-- Typed request and response objects.
-- Consistent error handling across provider responses.
-- Configurable base URL, API key, model, timeout, and retry behavior.
-- Test utilities for mocking model responses in application tests.
+- [x] A minimal chat API for synchronous responses.
+- [x] A streaming API for incremental model output.
+- [x] Typed request and response objects.
+- [x] Consistent error handling across provider responses.
+- [x] Configurable base URL, API key, model, timeout, and retry behavior.
+- [x] Test utilities for mocking model responses in application tests.
 
-## Planned Capabilities
+## Completed Capabilities
 
-As the project evolves, it is expected to grow toward:
+The SDK now includes the first production-oriented layers around that foundation:
 
-- OpenAI-compatible chat and response APIs.
-- Tool calling and structured JSON output.
-- Multi-provider adapters for common model platforms.
-- Request/response logging with redaction.
-- Metrics and tracing hooks.
-- Examples for common backend AI workflows.
+- [x] OpenAI-compatible chat completions and text-first Responses API clients.
+- [x] Tool-calling request and response plumbing for chat completions.
+- [x] Structured JSON output hints for chat completions and Responses API calls.
+- [x] Request/response diagnostics with conservative redaction.
+- [x] Safe lifecycle events and dependency-free metrics hooks.
+- [x] Spring Boot auto-configuration for configuration binding and dependency injection.
+- [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
+
+## Roadmap
+
+Future work should keep the SDK useful in production while avoiding provider-specific leakage in
+application code:
+
+- **Provider support**: add a provider adapter abstraction, keep OpenAI-compatible support as the
+  default path, and add focused provider modules for common platforms after the abstraction is stable.
+- **Observability**: add optional Micrometer metrics and OpenTelemetry tracing bridges while keeping
+  prompts, outputs, API keys, and raw provider bodies out of default telemetry.
+- **Responses API depth**: expand beyond text-first input and output when the public API shape is
+  clear, including image/file inputs, tool execution plumbing, background mode, and stored
+  conversation management.
+- **Production hardening**: improve timeout and cancellation coverage, add compatibility tests for
+  streaming edge cases, and keep release verification centered on `mvn verify` plus a clean working
+  tree.
+- **Developer experience**: add complete backend workflow examples, maintain migration notes and a
+  changelog before future releases, and keep all examples compiled by the normal Maven verification
+  path.
 
 ## Current Status
 
-This project is at an early stage. The README describes the intended direction and value of the SDK; implementation details and public APIs will evolve as the core modules are built.
+The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
+text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
+events, redacted payload diagnostics, Spring Boot auto-configuration, and in-memory testing support.
+
+The SDK does not yet include multi-provider adapters or built-in Micrometer/OpenTelemetry
+integrations. Those remain roadmap items so the public API can evolve deliberately instead of
+exposing provider-specific details too early.
 
 ## Requirements
 
