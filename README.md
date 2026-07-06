@@ -41,7 +41,6 @@ As the project evolves, it is expected to grow toward:
 - OpenAI-compatible chat and response APIs.
 - Tool calling and structured JSON output.
 - Multi-provider adapters for common model platforms.
-- Spring Boot starter support.
 - Request/response logging with redaction.
 - Metrics and tracing hooks.
 - Examples for common backend AI workflows.
@@ -61,7 +60,7 @@ Validate the project locally with:
 mvn verify
 ```
 
-`mvn verify` also compiles the example sources under `src/examples/java` so public usage snippets
+`mvn verify` also compiles the example sources under `core/src/examples/java` so public usage snippets
 stay aligned with the current API without being packaged into the runtime jar.
 
 ## Minimal Usage
@@ -382,6 +381,56 @@ This first Responses API surface intentionally focuses on text input and output.
 features such as image/file input, tool execution, background mode, and stored conversation
 management are left for later milestones.
 
+## Spring Boot Starter
+
+Spring Boot applications can add the starter module to get configuration binding and dependency
+injection for the default SDK client:
+
+```xml
+<dependency>
+    <groupId>io.wangrollin.ai</groupId>
+    <artifactId>ai-java-sdk-spring-boot-starter</artifactId>
+    <version>0.1.0-SNAPSHOT</version>
+</dependency>
+```
+
+Configure the provider through external application properties or environment-backed configuration.
+Do not commit real API keys to source control.
+
+```properties
+ai.sdk.api-key=${OPENAI_API_KEY}
+ai.sdk.model=gpt-4.1-mini
+ai.sdk.base-url=https://api.openai.com/v1
+ai.sdk.timeout=30s
+ai.sdk.retry.enabled=true
+ai.sdk.retry.max-attempts=3
+ai.sdk.retry.initial-delay=200ms
+ai.sdk.retry.max-delay=2s
+ai.sdk.retry.status-codes=429,500,502,503,504
+```
+
+The starter creates one `AiClient` bean when the application has not already defined an
+`AiClient`, `AiChatClient`, or `AiResponseClient`. Since `AiClient` implements both interfaces,
+application services can depend on the narrow contract they need:
+
+```java
+import io.wangrollin.ai.client.AiChatClient;
+import org.springframework.stereotype.Service;
+
+@Service
+class AssistantService {
+    private final AiChatClient client;
+
+    AssistantService(AiChatClient client) {
+        this.client = client;
+    }
+}
+```
+
+If the application defines `AiEventListener`, `AiPayloadDiagnosticsListener`, `AiRedactionPolicy`,
+or `java.net.http.HttpClient` beans, the starter passes them into the SDK builder. Retry remains
+disabled unless `ai.sdk.retry.enabled=true` is set, matching the core SDK default behavior.
+
 ## Testing Support
 
 Application code can depend on the `AiChatClient` or `AiResponseClient` interfaces and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
@@ -428,7 +477,7 @@ an external AI provider.
 
 ## Examples
 
-Small, compilable examples live in `src/examples/java/io/wangrollin/ai/examples`:
+Small, compilable examples live in `core/src/examples/java/io/wangrollin/ai/examples`:
 
 - `BasicChatExample` sends a synchronous chat request.
 - `StreamingChatExample` consumes incremental streaming deltas.
