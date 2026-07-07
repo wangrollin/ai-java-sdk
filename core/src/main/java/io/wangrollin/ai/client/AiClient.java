@@ -11,8 +11,9 @@ import io.wangrollin.ai.event.AiEventListener;
 import io.wangrollin.ai.internal.http.AiHttpExecutor;
 import io.wangrollin.ai.internal.http.AiHttpRequestSpec;
 import io.wangrollin.ai.internal.http.AiHttpResult;
-import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
-import io.wangrollin.ai.internal.openai.OpenAiResponseCodec;
+import io.wangrollin.ai.internal.provider.AiProviderAdapter;
+import io.wangrollin.ai.internal.provider.OpenAiCompatibleProviderAdapter;
+import io.wangrollin.ai.internal.provider.ProviderRequestSpec;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
@@ -26,11 +27,11 @@ import java.time.Duration;
 import java.util.Objects;
 
 /**
- * OpenAI-compatible HTTP implementation of {@link AiChatClient}.
+ * HTTP implementation of {@link AiChatClient}.
  *
  * <p>The client owns HTTP request construction, retry handling, streaming
  * response parsing, and safe lifecycle event emission. Provider-specific JSON
- * details stay inside the internal OpenAI adapter so application code can
+ * details stay inside an internal provider adapter so application code can
  * depend on the smaller {@link AiChatClient} contract where possible.
  */
 public final class AiClient implements AiChatClient, AiResponseClient {
@@ -44,15 +45,13 @@ public final class AiClient implements AiChatClient, AiResponseClient {
      */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-    private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
-    private static final OpenAiResponseCodec OPEN_AI_RESPONSE_CODEC = new OpenAiResponseCodec();
-    private static final String CHAT_PATH = "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH;
-    private static final String RESPONSES_PATH = "/" + OpenAiResponseCodec.RESPONSES_PATH;
+    private static final AiProviderAdapter DEFAULT_PROVIDER_ADAPTER = new OpenAiCompatibleProviderAdapter();
 
     private final String apiKey;
     private final URI baseUri;
     private final String defaultModel;
     private final Duration timeout;
+    private final AiProviderAdapter providerAdapter;
     private final AiHttpExecutor httpExecutor;
 
     private AiClient(Builder builder) {
@@ -63,6 +62,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
+        this.providerAdapter = DEFAULT_PROVIDER_ADAPTER;
         RetryPolicy retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
         AiEventListener eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
         AiPayloadDiagnosticsListener payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
@@ -95,38 +95,37 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     @Override
     public ChatResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String model = modelFor(request);
-        String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, false);
-        HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
+        ProviderRequestSpec providerRequest = providerAdapter.chatRequest(request, defaultModel, false);
+        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
                 .build();
 
         AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
                 "chat request",
-                "chat",
-                model,
-                CHAT_PATH,
-                false,
-                requestBody), HttpResponse.BodyHandlers.ofString());
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
+                providerRequest.body()), HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             httpExecutor.emitPayloadFailure(
-                    "chat",
-                    model,
-                    CHAT_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     response.body());
             AiException exception = providerResponseException("Chat request", response.statusCode(), response.body());
             httpExecutor.emitFailure(
-                    "chat",
-                    model,
-                    CHAT_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -135,18 +134,18 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         }
         try {
             httpExecutor.emitPayloadResponse(
-                    "chat",
-                    model,
-                    CHAT_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     response.body());
-            ChatResponse chatResponse = OPEN_AI_CODEC.parseResponse(response.body());
+            ChatResponse chatResponse = providerAdapter.parseChatResponse(response.body());
             httpExecutor.emitSuccess(
-                    "chat",
-                    eventModel(model, chatResponse.model()),
-                    CHAT_PATH,
-                    false,
+                    providerRequest.operation(),
+                    eventModel(providerRequest.model(), chatResponse.model()),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -155,10 +154,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
             return chatResponse;
         } catch (AiException e) {
             httpExecutor.emitFailure(
-                    "chat",
-                    model,
-                    CHAT_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -170,32 +169,31 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     @Override
     public ChatStream stream(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String model = modelFor(request);
-        String requestBody = OPEN_AI_CODEC.serializeRequest(request, defaultModel, true);
-        HttpRequest httpRequest = HttpRequest.newBuilder(chatCompletionsUri())
+        ProviderRequestSpec providerRequest = providerAdapter.chatRequest(request, defaultModel, true);
+        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
                 .build();
 
         AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
                 "streaming chat request",
-                "stream",
-                model,
-                CHAT_PATH,
-                true,
-                requestBody), HttpResponse.BodyHandlers.ofInputStream());
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
+                providerRequest.body()), HttpResponse.BodyHandlers.ofInputStream());
         HttpResponse<InputStream> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String errorBody = AiHttpExecutor.readBody(response.body());
             httpExecutor.emitPayloadFailure(
-                    "stream",
-                    model,
-                    CHAT_PATH,
-                    true,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     errorBody);
             AiException exception = providerResponseException(
@@ -203,10 +201,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
                     response.statusCode(),
                     errorBody);
             httpExecutor.emitFailure(
-                    "stream",
-                    model,
-                    CHAT_PATH,
-                    true,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -214,10 +212,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
             throw exception;
         }
         httpExecutor.emitSuccess(
-                "stream",
-                model,
-                CHAT_PATH,
-                true,
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
                 result.attempt(),
                 response.statusCode(),
                 result.duration(),
@@ -226,57 +224,52 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         long streamOpenNanos = System.nanoTime();
         return new ChatStream(
                 response.body(),
-                OPEN_AI_CODEC::parseStreamDelta,
+                providerAdapter::parseChatStreamDelta,
                 failure -> httpExecutor.emitFailure(
-                        "stream",
-                        model,
-                        CHAT_PATH,
-                        true,
+                        providerRequest.operation(),
+                        providerRequest.model(),
+                        providerRequest.path(),
+                        providerRequest.stream(),
                         result.attempt(),
                         response.statusCode(),
                         result.duration().plus(AiHttpExecutor.elapsedSince(streamOpenNanos)),
                         failure));
     }
 
-    private URI chatCompletionsUri() {
-        return baseUri.resolve(OpenAiChatCodec.CHAT_COMPLETIONS_PATH);
-    }
-
     @Override
     public ResponseResult respond(ResponseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String model = responseModelFor(request);
-        String requestBody = OPEN_AI_RESPONSE_CODEC.serializeRequest(request, defaultModel, false);
-        HttpRequest httpRequest = HttpRequest.newBuilder(responsesUri())
+        ProviderRequestSpec providerRequest = providerAdapter.responseRequest(request, defaultModel, false);
+        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
                 .build();
 
         AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
                 "response request",
-                "response",
-                model,
-                RESPONSES_PATH,
-                false,
-                requestBody), HttpResponse.BodyHandlers.ofString());
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
+                providerRequest.body()), HttpResponse.BodyHandlers.ofString());
         HttpResponse<String> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             httpExecutor.emitPayloadFailure(
-                    "response",
-                    model,
-                    RESPONSES_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     response.body());
             AiException exception = providerResponseException("Response request", response.statusCode(), response.body());
             httpExecutor.emitFailure(
-                    "response",
-                    model,
-                    RESPONSES_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -285,18 +278,18 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         }
         try {
             httpExecutor.emitPayloadResponse(
-                    "response",
-                    model,
-                    RESPONSES_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     response.body());
-            ResponseResult responseResult = OPEN_AI_RESPONSE_CODEC.parseResponse(response.body());
+            ResponseResult responseResult = providerAdapter.parseResponseResult(response.body());
             httpExecutor.emitSuccess(
-                    "response",
-                    responseResult.model() == null ? model : responseResult.model(),
-                    RESPONSES_PATH,
-                    false,
+                    providerRequest.operation(),
+                    responseResult.model() == null ? providerRequest.model() : responseResult.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -305,10 +298,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
             return responseResult;
         } catch (AiException e) {
             httpExecutor.emitFailure(
-                    "response",
-                    model,
-                    RESPONSES_PATH,
-                    false,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -320,32 +313,31 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     @Override
     public ResponseStream streamResponse(ResponseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        String model = responseModelFor(request);
-        String requestBody = OPEN_AI_RESPONSE_CODEC.serializeRequest(request, defaultModel, true);
-        HttpRequest httpRequest = HttpRequest.newBuilder(responsesUri())
+        ProviderRequestSpec providerRequest = providerAdapter.responseRequest(request, defaultModel, true);
+        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
                 .timeout(timeout)
                 .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(requestBody))
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
                 .build();
 
         AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
                 "streaming response request",
-                "response.stream",
-                model,
-                RESPONSES_PATH,
-                true,
-                requestBody), HttpResponse.BodyHandlers.ofInputStream());
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
+                providerRequest.body()), HttpResponse.BodyHandlers.ofInputStream());
         HttpResponse<InputStream> response = result.response();
         if (response.statusCode() < 200 || response.statusCode() >= 300) {
             String errorBody = AiHttpExecutor.readBody(response.body());
             httpExecutor.emitPayloadFailure(
-                    "response.stream",
-                    model,
-                    RESPONSES_PATH,
-                    true,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     response.statusCode(),
                     errorBody);
             AiException exception = providerResponseException(
@@ -353,10 +345,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
                     response.statusCode(),
                     errorBody);
             httpExecutor.emitFailure(
-                    "response.stream",
-                    model,
-                    RESPONSES_PATH,
-                    true,
+                    providerRequest.operation(),
+                    providerRequest.model(),
+                    providerRequest.path(),
+                    providerRequest.stream(),
                     result.attempt(),
                     response.statusCode(),
                     result.duration(),
@@ -364,10 +356,10 @@ public final class AiClient implements AiChatClient, AiResponseClient {
             throw exception;
         }
         httpExecutor.emitSuccess(
-                "response.stream",
-                model,
-                RESPONSES_PATH,
-                true,
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                providerRequest.stream(),
                 result.attempt(),
                 response.statusCode(),
                 result.duration(),
@@ -376,28 +368,20 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         long streamOpenNanos = System.nanoTime();
         return new ResponseStream(
                 response.body(),
-                OPEN_AI_RESPONSE_CODEC::parseStreamDelta,
+                providerAdapter::parseResponseStreamDelta,
                 failure -> httpExecutor.emitFailure(
-                        "response.stream",
-                        model,
-                        RESPONSES_PATH,
-                        true,
+                        providerRequest.operation(),
+                        providerRequest.model(),
+                        providerRequest.path(),
+                        providerRequest.stream(),
                         result.attempt(),
                         response.statusCode(),
                         result.duration().plus(AiHttpExecutor.elapsedSince(streamOpenNanos)),
                         failure));
     }
 
-    private URI responsesUri() {
-        return baseUri.resolve(OpenAiResponseCodec.RESPONSES_PATH);
-    }
-
-    private String modelFor(ChatRequest request) {
-        return request.model() == null ? defaultModel : request.model();
-    }
-
-    private String responseModelFor(ResponseRequest request) {
-        return request.model() == null ? defaultModel : request.model();
+    private URI providerUri(ProviderRequestSpec providerRequest) {
+        return baseUri.resolve(providerRequest.relativePath());
     }
 
     private String eventModel(String requestModel, String responseModel) {
@@ -431,8 +415,8 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         return normalized.substring(0, 500) + "...";
     }
 
-    private static AiException providerResponseException(String requestDescription, int statusCode, String body) {
-        AiError error = OPEN_AI_CODEC.parseError(body);
+    private AiException providerResponseException(String requestDescription, int statusCode, String body) {
+        AiError error = providerAdapter.parseError(body);
         String detail = error != null && error.message() != null ? error.message() : summarize(body);
         return new AiException(
                 requestDescription + " failed with HTTP status " + statusCode + ": " + detail,

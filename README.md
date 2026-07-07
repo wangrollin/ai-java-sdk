@@ -45,6 +45,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Request/response diagnostics with conservative redaction.
 - [x] Safe lifecycle events, dependency-free metrics hooks, and an optional Micrometer bridge.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
+- [x] Internal provider adapter boundary with OpenAI-compatible support as the default implementation.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
 ## Roadmap
@@ -52,8 +53,8 @@ The SDK now includes the first production-oriented layers around that foundation
 Future work should keep the SDK useful in production while avoiding provider-specific leakage in
 application code:
 
-- **Provider support**: add a provider adapter abstraction, keep OpenAI-compatible support as the
-  default path, and add focused provider modules for common platforms after the abstraction is stable.
+- **Provider support**: build focused provider modules on top of the internal adapter boundary while
+  keeping OpenAI-compatible support as the default path.
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
   bridge, especially OpenTelemetry tracing, while keeping prompts, outputs, API keys, and raw
   provider bodies out of default telemetry.
@@ -72,7 +73,7 @@ application code:
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
 text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
 events, optional Micrometer metrics, redacted payload diagnostics, Spring Boot auto-configuration,
-and in-memory testing support.
+an internal provider adapter boundary, and in-memory testing support.
 
 The SDK does not yet include multi-provider adapters or built-in OpenTelemetry tracing. Those remain
 roadmap items so the public API can evolve deliberately instead of exposing provider-specific details
