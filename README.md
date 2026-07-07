@@ -43,7 +43,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Tool-calling request and response plumbing for chat completions.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
 - [x] Request/response diagnostics with conservative redaction.
-- [x] Safe lifecycle events and dependency-free metrics hooks.
+- [x] Safe lifecycle events, dependency-free metrics hooks, and an optional Micrometer bridge.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
@@ -54,8 +54,9 @@ application code:
 
 - **Provider support**: add a provider adapter abstraction, keep OpenAI-compatible support as the
   default path, and add focused provider modules for common platforms after the abstraction is stable.
-- **Observability**: add optional Micrometer metrics and OpenTelemetry tracing bridges while keeping
-  prompts, outputs, API keys, and raw provider bodies out of default telemetry.
+- **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
+  bridge, especially OpenTelemetry tracing, while keeping prompts, outputs, API keys, and raw
+  provider bodies out of default telemetry.
 - **Responses API depth**: expand beyond text-first input and output when the public API shape is
   clear, including image/file inputs, tool execution plumbing, background mode, and stored
   conversation management.
@@ -70,11 +71,12 @@ application code:
 
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
 text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
-events, redacted payload diagnostics, Spring Boot auto-configuration, and in-memory testing support.
+events, optional Micrometer metrics, redacted payload diagnostics, Spring Boot auto-configuration,
+and in-memory testing support.
 
-The SDK does not yet include multi-provider adapters or built-in Micrometer/OpenTelemetry
-integrations. Those remain roadmap items so the public API can evolve deliberately instead of
-exposing provider-specific details too early.
+The SDK does not yet include multi-provider adapters or built-in OpenTelemetry tracing. Those remain
+roadmap items so the public API can evolve deliberately instead of exposing provider-specific details
+too early.
 
 ## Requirements
 
@@ -264,9 +266,7 @@ AiChatClient loggedClient = AiClient.builder()
 
 For lightweight metrics without adding a telemetry dependency, attach `InMemoryAiMetricsListener`.
 It counts lifecycle attempts, terminal statuses, models, durations, and token usage from the same
-safe event payloads. Applications that already use Micrometer, OpenTelemetry, or another metrics
-stack can implement `AiEventListener` directly and bridge these safe fields into their own
-instruments.
+safe event payloads.
 
 ```java
 InMemoryAiMetricsListener metrics = InMemoryAiMetricsListener.create();
@@ -287,6 +287,32 @@ System.out.printf(
     snapshot.startedCount(),
     snapshot.succeededCount(),
     snapshot.failedCount());
+```
+
+Applications that already use Micrometer can add the optional bridge module and register the same
+safe lifecycle fields as Micrometer meters. The bridge intentionally avoids high-cardinality and
+sensitive tags such as provider paths, base URLs, prompts, outputs, tool arguments, raw bodies, and
+diagnostic messages.
+
+```xml
+<dependency>
+    <groupId>io.wangrollin.ai</groupId>
+    <artifactId>ai-java-sdk-micrometer</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+```java
+import io.micrometer.core.instrument.MeterRegistry;
+import io.wangrollin.ai.micrometer.MicrometerAiEventListener;
+
+MeterRegistry registry = // obtain from your application runtime
+
+AiChatClient micrometerClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .eventListener(MicrometerAiEventListener.create(registry))
+    .build();
 ```
 
 When troubleshooting provider wire-shape problems, opt in to redacted payload diagnostics. This is
