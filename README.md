@@ -43,7 +43,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Tool-calling request and response plumbing for chat completions.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
 - [x] Request/response diagnostics with conservative redaction.
-- [x] Safe lifecycle events, dependency-free metrics hooks, and an optional Micrometer bridge.
+- [x] Safe lifecycle events, dependency-free metrics hooks, optional Micrometer metrics, and optional OpenTelemetry tracing.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
 - [x] Internal provider adapter boundary with OpenAI-compatible support as the default implementation.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
@@ -56,8 +56,8 @@ application code:
 - **Provider support**: build focused provider modules on top of the internal adapter boundary while
   keeping OpenAI-compatible support as the default path.
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
-  bridge, especially OpenTelemetry tracing, while keeping prompts, outputs, API keys, and raw
-  provider bodies out of default telemetry.
+  and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
+  default telemetry.
 - **Responses API depth**: expand beyond text-first input and output when the public API shape is
   clear, including image/file inputs, tool execution plumbing, background mode, and stored
   conversation management.
@@ -72,10 +72,10 @@ application code:
 
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
 text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
-events, optional Micrometer metrics, redacted payload diagnostics, Spring Boot auto-configuration,
-an internal provider adapter boundary, and in-memory testing support.
+events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics,
+Spring Boot auto-configuration, an internal provider adapter boundary, and in-memory testing support.
 
-The SDK does not yet include multi-provider adapters or built-in OpenTelemetry tracing. Those remain
+The SDK does not yet include multi-provider adapters. Those remain
 roadmap items so the public API can evolve deliberately instead of exposing provider-specific details
 too early.
 
@@ -313,6 +313,31 @@ AiChatClient micrometerClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(MicrometerAiEventListener.create(registry))
+    .build();
+```
+
+Applications that already export OpenTelemetry traces can add the optional bridge module. The
+listener creates request-attempt spans from the same safe lifecycle fields and avoids prompts,
+outputs, API keys, raw bodies, provider paths, base URLs, and diagnostic messages by default.
+
+```xml
+<dependency>
+    <groupId>io.wangrollin.ai</groupId>
+    <artifactId>ai-java-sdk-opentelemetry</artifactId>
+    <version>0.1.0</version>
+</dependency>
+```
+
+```java
+import io.opentelemetry.api.OpenTelemetry;
+import io.wangrollin.ai.opentelemetry.OpenTelemetryAiEventListener;
+
+OpenTelemetry openTelemetry = // obtain from your application runtime
+
+AiChatClient tracedClient = AiClient.builder()
+    .apiKey(System.getenv("OPENAI_API_KEY"))
+    .defaultModel("gpt-4.1-mini")
+    .eventListener(OpenTelemetryAiEventListener.create(openTelemetry))
     .build();
 ```
 
