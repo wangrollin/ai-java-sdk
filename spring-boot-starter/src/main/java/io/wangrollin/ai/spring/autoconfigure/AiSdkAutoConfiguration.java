@@ -40,6 +40,7 @@ public class AiSdkAutoConfiguration {
         AiClient.Builder builder = AiClient.builder()
                 .apiKey(properties.requireApiKey())
                 .defaultModel(properties.requireModel())
+                .provider(properties.requireProvider())
                 .baseUrl(properties.requireBaseUrl())
                 .timeout(properties.requireTimeout())
                 .retryPolicy(retryPolicy(properties.getRetry()));

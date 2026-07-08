@@ -45,8 +45,6 @@ public final class AiClient implements AiChatClient, AiResponseClient {
      */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
 
-    private static final AiProviderAdapter DEFAULT_PROVIDER_ADAPTER = new OpenAiCompatibleProviderAdapter();
-
     private final String apiKey;
     private final URI baseUri;
     private final String defaultModel;
@@ -62,7 +60,9 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
-        this.providerAdapter = DEFAULT_PROVIDER_ADAPTER;
+        this.providerAdapter = providerAdapter(builder.provider == null
+                ? AiProvider.OPENAI_COMPATIBLE
+                : builder.provider);
         RetryPolicy retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
         AiEventListener eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
         AiPayloadDiagnosticsListener payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
@@ -404,6 +404,14 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         return value;
     }
 
+    private static AiProviderAdapter providerAdapter(AiProvider provider) {
+        return switch (provider) {
+            // Keep protocol selection public and adapter classes internal so new
+            // providers can be added without freezing the adapter SPI too early.
+            case OPENAI_COMPATIBLE -> new OpenAiCompatibleProviderAdapter();
+        };
+    }
+
     private static String summarize(String body) {
         if (body == null || body.isBlank()) {
             return "<empty body>";
@@ -437,6 +445,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         private AiPayloadDiagnosticsListener payloadDiagnosticsListener;
         private AiRedactionPolicy redactionPolicy;
         private HttpClient httpClient;
+        private AiProvider provider;
 
         private Builder() {
         }
@@ -471,6 +480,21 @@ public final class AiClient implements AiChatClient, AiResponseClient {
          */
         public Builder defaultModel(String defaultModel) {
             this.defaultModel = defaultModel;
+            return this;
+        }
+
+        /**
+         * Sets the provider protocol used to translate SDK requests to HTTP payloads.
+         *
+         * <p>The default is {@link AiProvider#OPENAI_COMPATIBLE}. The builder
+         * accepts a provider enum instead of an internal adapter instance so
+         * application code does not depend on provider wire-shape internals.
+         *
+         * @param provider provider protocol to use
+         * @return this builder
+         */
+        public Builder provider(AiProvider provider) {
+            this.provider = Objects.requireNonNull(provider, "provider must not be null");
             return this;
         }
 

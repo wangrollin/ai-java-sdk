@@ -53,8 +53,8 @@ The SDK now includes the first production-oriented layers around that foundation
 Future work should keep the SDK useful in production while avoiding provider-specific leakage in
 application code:
 
-- **Provider support**: build focused provider modules on top of the internal adapter boundary while
-  keeping OpenAI-compatible support as the default path.
+- **Provider support**: build focused provider modules on top of the configurable provider boundary
+  while keeping OpenAI-compatible support as the default path.
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
   and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
   default telemetry.
@@ -73,11 +73,11 @@ application code:
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
 text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
 events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics,
-Spring Boot auto-configuration, an internal provider adapter boundary, and in-memory testing support.
+Spring Boot auto-configuration, a configurable provider boundary, and in-memory testing support.
 
-The SDK does not yet include multi-provider adapters. Those remain
-roadmap items so the public API can evolve deliberately instead of exposing provider-specific details
-too early.
+The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
+Those remain roadmap items so the public API can evolve deliberately instead of exposing
+provider-specific details too early.
 
 ## Requirements
 
@@ -101,6 +101,8 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiResponseClient;
+import io.wangrollin.ai.client.AiProvider;
+import io.wangrollin.ai.client.RetryPolicy;
 import io.wangrollin.ai.event.AiEventListener;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.chat.ChatDelta;
@@ -116,7 +118,6 @@ import io.wangrollin.ai.diagnostic.LoggingAiPayloadDiagnosticsListener;
 import io.wangrollin.ai.event.AiMetricsSnapshot;
 import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
-import io.wangrollin.ai.client.RetryPolicy;
 import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
@@ -127,6 +128,7 @@ import java.time.Duration;
 
 AiChatClient client = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .provider(AiProvider.OPENAI_COMPATIBLE)
     .baseUrl("https://api.openai.com/v1")
     .defaultModel("gpt-4.1-mini")
     .timeout(Duration.ofSeconds(30))
@@ -479,6 +481,7 @@ Do not commit real API keys to source control.
 ```properties
 ai.sdk.api-key=${OPENAI_API_KEY}
 ai.sdk.model=gpt-4.1-mini
+ai.sdk.provider=openai-compatible
 ai.sdk.base-url=https://api.openai.com/v1
 ai.sdk.timeout=30s
 ai.sdk.retry.enabled=true
@@ -509,6 +512,8 @@ class AssistantService {
 If the application defines `AiEventListener`, `AiPayloadDiagnosticsListener`, `AiRedactionPolicy`,
 or `java.net.http.HttpClient` beans, the starter passes them into the SDK builder. Retry remains
 disabled unless `ai.sdk.retry.enabled=true` is set, matching the core SDK default behavior.
+`ai.sdk.provider` defaults to `openai-compatible`, so applications can omit it until they need to
+make provider protocol selection explicit across environments.
 
 ## Testing Support
 

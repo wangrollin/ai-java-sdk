@@ -78,6 +78,38 @@ class AiSdkAutoConfigurationTest {
     }
 
     @Test
+    void bindsExplicitOpenAiCompatibleProvider() throws Exception {
+        startServer(exchange -> respond(exchange, 200, """
+                {"choices":[{"message":{"content":"ok"}}]}
+                """));
+
+        contextRunner
+                .withPropertyValues(requiredProperties())
+                .withPropertyValues("ai.sdk.provider=openai-compatible")
+                .run(context -> {
+                    String text = context.getBean(AiChatClient.class)
+                            .chat(ChatRequest.builder()
+                                    .message(ChatMessage.user("Hello"))
+                                    .build())
+                            .text();
+
+                    assertEquals("ok", text);
+                });
+    }
+
+    @Test
+    void failsFastWhenProviderConfigurationIsInvalid() {
+        contextRunner
+                .withPropertyValues(
+                        "ai.sdk.api-key=test-key",
+                        "ai.sdk.model=test-model",
+                        "ai.sdk.provider=unknown")
+                .run(context -> {
+                    assertTrue(hasCauseMessage(context.getStartupFailure(), "ai.sdk.provider"));
+                });
+    }
+
+    @Test
     void backsOffWhenApplicationProvidesSdkClient() {
         contextRunner
                 .withUserConfiguration(UserClientConfiguration.class)

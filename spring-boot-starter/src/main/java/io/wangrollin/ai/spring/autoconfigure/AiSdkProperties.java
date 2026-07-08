@@ -1,6 +1,7 @@
 package io.wangrollin.ai.spring.autoconfigure;
 
 import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.AiProvider;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -30,6 +31,11 @@ public class AiSdkProperties {
      * OpenAI-compatible provider base URL.
      */
     private String baseUrl = AiClient.DEFAULT_BASE_URL;
+
+    /**
+     * Provider protocol used to translate SDK requests into provider HTTP payloads.
+     */
+    private AiProvider provider = AiProvider.OPENAI_COMPATIBLE;
 
     /**
      * HTTP connection and request timeout.
@@ -65,6 +71,14 @@ public class AiSdkProperties {
         this.baseUrl = baseUrl;
     }
 
+    public AiProvider getProvider() {
+        return provider;
+    }
+
+    public void setProvider(AiProvider provider) {
+        this.provider = provider == null ? AiProvider.OPENAI_COMPATIBLE : provider;
+    }
+
     public Duration getTimeout() {
         return timeout;
     }
@@ -98,6 +112,13 @@ public class AiSdkProperties {
             throw new IllegalStateException("ai.sdk.timeout must not be null");
         }
         return timeout;
+    }
+
+    AiProvider requireProvider() {
+        if (provider == null) {
+            throw new IllegalStateException("ai.sdk.provider must not be null");
+        }
+        return provider;
     }
 
     private static String requireText(String value, String propertyName) {
