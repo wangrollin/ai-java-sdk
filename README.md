@@ -39,7 +39,7 @@ implementation milestone:
 
 The SDK now includes the first production-oriented layers around that foundation:
 
-- [x] OpenAI-compatible chat completions and text-first Responses API clients.
+- [x] OpenAI-compatible chat completions and Responses API clients.
 - [x] Tool-calling request and response plumbing for chat completions.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
 - [x] Request/response diagnostics with conservative redaction.
@@ -58,9 +58,8 @@ application code:
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
   and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
   default telemetry.
-- **Responses API depth**: expand beyond text-first input and output when the public API shape is
-  clear, including image/file inputs, tool execution plumbing, background mode, and stored
-  conversation management.
+- **Responses API depth**: continue expanding beyond text and image input when the public API shape
+  is clear, including tool execution plumbing, background mode, and stored conversation management.
 - **Production hardening**: improve timeout and cancellation coverage, add compatibility tests for
   streaming edge cases, and keep release verification centered on `mvn verify` plus a clean working
   tree.
@@ -71,9 +70,10 @@ application code:
 ## Current Status
 
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
-text-first Responses API, streaming, tool-calling plumbing, structured output hints, safe lifecycle
-events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics,
-Spring Boot auto-configuration, a configurable provider boundary, and in-memory testing support.
+Responses API, streaming, tool-calling plumbing, structured output hints, typed image input
+references for Responses API calls, safe lifecycle events, optional Micrometer metrics, optional
+OpenTelemetry tracing, redacted payload diagnostics, Spring Boot auto-configuration, a configurable
+provider boundary, and in-memory testing support.
 
 The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
 Those remain roadmap items so the public API can evolve deliberately instead of exposing
@@ -119,6 +119,8 @@ import io.wangrollin.ai.event.AiMetricsSnapshot;
 import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseInputMessage;
+import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
@@ -407,7 +409,7 @@ Streaming requests only retry failures that happen before a successful response 
 
 ## Responses API
 
-The SDK also includes a text-first OpenAI-compatible Responses API client. It reuses the same
+The SDK also includes an OpenAI-compatible Responses API client for text output. It reuses the same
 timeouts, retry policy, safe lifecycle events, metrics listener, and redacted payload diagnostics as
 chat completions.
 
@@ -458,8 +460,25 @@ try (ResponseStream stream = responseClient.streamResponse(ResponseRequest.build
 }
 ```
 
-This first Responses API surface intentionally focuses on text input and output. Advanced provider
-features such as image/file input, tool execution, background mode, and stored conversation
+Responses API requests can also send typed input messages that combine text with image references.
+The SDK passes image URLs, data URLs, or provider file ids through to the OpenAI-compatible adapter;
+applications remain responsible for hosting images, creating data URLs, or uploading files when a
+provider-specific file workflow is required.
+
+```java
+ResponseResult imageSummary = responseClient.respond(ResponseRequest.builder()
+    .inputMessage(ResponseInputMessage.user(
+        ResponseInputPart.text("Describe the operational risk visible in this image."),
+        ResponseInputPart.imageUrl(
+            "https://example.com/dashboard.png",
+            ResponseInputPart.ImageDetail.LOW)))
+    .build());
+
+System.out.println(imageSummary.text());
+```
+
+For a previously uploaded provider file id, use `ResponseInputPart.imageFileId("file_...")`.
+Advanced provider features such as tool execution, background mode, and stored conversation
 management are left for later milestones.
 
 ## Spring Boot Starter
@@ -565,7 +584,7 @@ Small, compilable examples live in `core/src/examples/java/io/wangrollin/ai/exam
 
 - `BasicChatExample` sends a synchronous chat request.
 - `StreamingChatExample` consumes incremental streaming deltas.
-- `ResponsesExample` sends synchronous and streaming text-first Responses API requests.
+- `ResponsesExample` sends text, structured-output, image-input, and streaming Responses API requests.
 - `ToolCallingExample` shows provider tool-call plumbing while application code executes the tool.
 - `MetricsListenerExample` collects safe request metrics from lifecycle events.
 - `PayloadDiagnosticsExample` enables opt-in redacted payload diagnostics.

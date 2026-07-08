@@ -4,6 +4,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseInputMessage;
+import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseTextFormat;
@@ -77,6 +79,54 @@ class OpenAiResponseCodecTest {
 
         JsonNode format = OBJECT_MAPPER.readTree(body).path("text").path("format");
         assertEquals("json_object", format.path("type").asText());
+    }
+
+    @Test
+    void serializesMultimodalImageUrlInput() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .inputMessage(ResponseInputMessage.user(
+                        ResponseInputPart.text("Describe this image."),
+                        ResponseInputPart.imageUrl(
+                                "https://example.com/image.png",
+                                ResponseInputPart.ImageDetail.HIGH)))
+                .build(), "default-model", false);
+
+        JsonNode content = OBJECT_MAPPER.readTree(body).path("input").path(0).path("content");
+        assertEquals("user", OBJECT_MAPPER.readTree(body).path("input").path(0).path("role").asText());
+        assertEquals("input_text", content.path(0).path("type").asText());
+        assertEquals("Describe this image.", content.path(0).path("text").asText());
+        assertEquals("input_image", content.path(1).path("type").asText());
+        assertEquals("https://example.com/image.png", content.path(1).path("image_url").asText());
+        assertEquals("high", content.path(1).path("detail").asText());
+    }
+
+    @Test
+    void serializesMultimodalDataUrlWithoutRewriting() throws Exception {
+        String dataUrl = "data:image/png;base64,iVBORw0KGgo=";
+
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .inputMessage(ResponseInputMessage.user(ResponseInputPart.imageUrl(dataUrl)))
+                .build(), "default-model", false);
+
+        JsonNode image = OBJECT_MAPPER.readTree(body).path("input").path(0).path("content").path(0);
+        assertEquals("input_image", image.path("type").asText());
+        assertEquals(dataUrl, image.path("image_url").asText());
+    }
+
+    @Test
+    void serializesMultimodalImageFileIdInput() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .inputMessage(ResponseInputMessage.user(
+                        ResponseInputPart.text("Extract invoice fields."),
+                        ResponseInputPart.imageFileId(
+                                "file-abc123",
+                                ResponseInputPart.ImageDetail.ORIGINAL)))
+                .build(), "default-model", false);
+
+        JsonNode image = OBJECT_MAPPER.readTree(body).path("input").path(0).path("content").path(1);
+        assertEquals("input_image", image.path("type").asText());
+        assertEquals("file-abc123", image.path("file_id").asText());
+        assertEquals("original", image.path("detail").asText());
     }
 
     @Test

@@ -5,6 +5,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseInputMessage;
+import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseTextFormat;
@@ -106,7 +108,7 @@ public final class OpenAiResponseCodec {
         String model = request.model() == null ? defaultModel : request.model();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
-        payload.put("input", request.input());
+        payload.put("input", inputPayload(request));
         putIfPresent(payload, "instructions", request.instructions());
         putIfPresent(payload, "temperature", request.temperature());
         putIfPresent(payload, "top_p", request.topP());
@@ -114,6 +116,45 @@ public final class OpenAiResponseCodec {
         putIfPresent(payload, "text", textPayload(request.textFormat()));
         if (stream) {
             payload.put("stream", true);
+        }
+        return payload;
+    }
+
+    private Object inputPayload(ResponseRequest request) {
+        if (request.input() != null) {
+            return request.input();
+        }
+        return request.inputMessages().stream()
+                .map(OpenAiResponseCodec::inputMessagePayload)
+                .toList();
+    }
+
+    private static Map<String, Object> inputMessagePayload(ResponseInputMessage message) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("role", message.role());
+        payload.put("content", message.content().stream()
+                .map(OpenAiResponseCodec::inputPartPayload)
+                .toList());
+        return payload;
+    }
+
+    private static Map<String, Object> inputPartPayload(ResponseInputPart part) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        switch (part.kind()) {
+            case TEXT -> {
+                payload.put("type", "input_text");
+                payload.put("text", part.text());
+            }
+            case IMAGE_URL -> {
+                payload.put("type", "input_image");
+                payload.put("image_url", part.imageUrl());
+                putIfPresent(payload, "detail", part.detailValue());
+            }
+            case IMAGE_FILE_ID -> {
+                payload.put("type", "input_image");
+                payload.put("file_id", part.fileId());
+                putIfPresent(payload, "detail", part.detailValue());
+            }
         }
         return payload;
     }

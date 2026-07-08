@@ -3,13 +3,15 @@ package io.wangrollin.ai.examples;
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseInputMessage;
+import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
 import io.wangrollin.ai.response.ResponseTextFormat;
 
 /**
- * Minimal text-first Responses API example.
+ * Minimal Responses API example for text, structured output, image input, and streaming.
  */
 public final class ResponsesExample {
     private ResponsesExample() {
@@ -42,6 +44,15 @@ public final class ResponsesExample {
                         """))
                 .build());
         System.out.println(structured.text());
+
+        ResponseResult imageSummary = client.respond(ResponseRequest.builder()
+                .inputMessage(ResponseInputMessage.user(
+                        ResponseInputPart.text("Describe the operational risk visible in this image."),
+                        ResponseInputPart.imageUrl(
+                                "https://example.com/dashboard.png",
+                                ResponseInputPart.ImageDetail.LOW)))
+                .build());
+        System.out.println(imageSummary.text());
 
         try (ResponseStream stream = client.streamResponse(ResponseRequest.builder()
                 .input("Give me two short rollout checks.")

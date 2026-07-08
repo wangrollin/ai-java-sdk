@@ -10,6 +10,8 @@ import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
 import io.wangrollin.ai.diagnostic.AiPayloadResponseEvent;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseInputMessage;
+import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
@@ -104,6 +106,35 @@ class AiResponseClientTest {
                 .build());
 
         assertEquals("request-model", OBJECT_MAPPER.readTree(captured.get().body()).path("model").asText());
+    }
+
+    @Test
+    void sendsResponseMultimodalInputMessages() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"output_text":"The image shows a clean dashboard."}
+                    """);
+        });
+
+        ResponseResult result = testClient().respond(ResponseRequest.builder()
+                .inputMessage(ResponseInputMessage.user(
+                        ResponseInputPart.text("Describe this image."),
+                        ResponseInputPart.imageUrl(
+                                "https://example.com/dashboard.png",
+                                ResponseInputPart.ImageDetail.LOW)))
+                .build());
+
+        assertEquals("The image shows a clean dashboard.", result.text());
+        JsonNode input = OBJECT_MAPPER.readTree(captured.get().body()).path("input");
+        JsonNode content = input.path(0).path("content");
+        assertEquals("user", input.path(0).path("role").asText());
+        assertEquals("input_text", content.path(0).path("type").asText());
+        assertEquals("Describe this image.", content.path(0).path("text").asText());
+        assertEquals("input_image", content.path(1).path("type").asText());
+        assertEquals("https://example.com/dashboard.png", content.path(1).path("image_url").asText());
+        assertEquals("low", content.path(1).path("detail").asText());
     }
 
     @Test

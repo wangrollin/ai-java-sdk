@@ -1,11 +1,16 @@
 package io.wangrollin.ai.response;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Objects;
+
 /**
- * Immutable text-first request for the OpenAI-compatible Responses API.
+ * Immutable request for the OpenAI-compatible Responses API.
  */
 public final class ResponseRequest {
     private final String model;
     private final String input;
+    private final List<ResponseInputMessage> inputMessages;
     private final String instructions;
     private final Double temperature;
     private final Double topP;
@@ -14,7 +19,14 @@ public final class ResponseRequest {
 
     private ResponseRequest(Builder builder) {
         this.model = normalizeOptionalText(builder.model);
-        this.input = requireText(builder.input, "input");
+        this.input = builder.input == null ? null : requireText(builder.input, "input");
+        this.inputMessages = List.copyOf(builder.inputMessages);
+        if (this.input == null && this.inputMessages.isEmpty()) {
+            throw new IllegalArgumentException("input or inputMessages must be configured");
+        }
+        if (this.input != null && !this.inputMessages.isEmpty()) {
+            throw new IllegalArgumentException("input and inputMessages cannot both be configured");
+        }
         this.instructions = normalizeOptionalText(builder.instructions);
         this.temperature = requireNonNegative(builder.temperature, "temperature");
         this.topP = requireNonNegative(builder.topP, "topP");
@@ -31,30 +43,74 @@ public final class ResponseRequest {
         return new Builder();
     }
 
+    /**
+     * Returns the request-specific model override, or {@code null} to use the client default.
+     *
+     * @return optional model override
+     */
     public String model() {
         return model;
     }
 
+    /**
+     * Returns the text input, or {@code null} when this request uses typed input messages.
+     *
+     * @return optional text input
+     */
     public String input() {
         return input;
     }
 
+    /**
+     * Returns the typed input messages, or an empty list when this request uses text input.
+     *
+     * @return immutable input message list
+     */
+    public List<ResponseInputMessage> inputMessages() {
+        return inputMessages;
+    }
+
+    /**
+     * Optional developer instructions for the model.
+     *
+     * @return optional instruction text
+     */
     public String instructions() {
         return instructions;
     }
 
+    /**
+     * Optional sampling temperature.
+     *
+     * @return optional sampling temperature
+     */
     public Double temperature() {
         return temperature;
     }
 
+    /**
+     * Optional nucleus sampling probability mass.
+     *
+     * @return optional top-p value
+     */
     public Double topP() {
         return topP;
     }
 
+    /**
+     * Optional output token cap.
+     *
+     * @return optional output token cap
+     */
     public Integer maxOutputTokens() {
         return maxOutputTokens;
     }
 
+    /**
+     * Optional structured-output text format.
+     *
+     * @return optional text format
+     */
     public ResponseTextFormat textFormat() {
         return textFormat;
     }
@@ -65,6 +121,7 @@ public final class ResponseRequest {
     public static final class Builder {
         private String model;
         private String input;
+        private final List<ResponseInputMessage> inputMessages = new ArrayList<>();
         private String instructions;
         private Double temperature;
         private Double topP;
@@ -93,6 +150,29 @@ public final class ResponseRequest {
          */
         public Builder input(String input) {
             this.input = input;
+            return this;
+        }
+
+        /**
+         * Adds one multimodal input message to the request.
+         *
+         * @param message input message to append
+         * @return this builder
+         */
+        public Builder inputMessage(ResponseInputMessage message) {
+            this.inputMessages.add(Objects.requireNonNull(message, "message must not be null"));
+            return this;
+        }
+
+        /**
+         * Adds multiple multimodal input messages in list order.
+         *
+         * @param messages input messages to append
+         * @return this builder
+         */
+        public Builder inputMessages(List<ResponseInputMessage> messages) {
+            Objects.requireNonNull(messages, "messages must not be null");
+            messages.forEach(this::inputMessage);
             return this;
         }
 
@@ -169,9 +249,7 @@ public final class ResponseRequest {
     }
 
     private static String requireText(String value, String name) {
-        if (value == null) {
-            throw new IllegalArgumentException(name + " must not be null");
-        }
+        Objects.requireNonNull(value, name + " must not be null");
         if (value.isBlank()) {
             throw new IllegalArgumentException(name + " must not be blank");
         }
