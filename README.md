@@ -41,6 +41,7 @@ The SDK now includes the first production-oriented layers around that foundation
 
 - [x] OpenAI-compatible chat completions and Responses API clients.
 - [x] Tool-calling request and response plumbing for chat completions.
+- [x] Tool-calling request and response plumbing for Responses API calls.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
 - [x] Request/response diagnostics with conservative redaction.
 - [x] Safe lifecycle events, dependency-free metrics hooks, optional Micrometer metrics, and optional OpenTelemetry tracing.
@@ -58,8 +59,8 @@ application code:
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
   and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
   default telemetry.
-- **Responses API depth**: continue expanding beyond text and image input when the public API shape
-  is clear, including tool execution plumbing, background mode, and stored conversation management.
+- **Responses API depth**: continue expanding beyond text, image input, and tool plumbing when the
+  public API shape is clear, including background mode and stored conversation management.
 - **Production hardening**: improve timeout and cancellation coverage, add compatibility tests for
   streaming edge cases, and keep release verification centered on `mvn verify` plus a clean working
   tree.
@@ -73,7 +74,7 @@ The v0.1.0 foundation has been released. It supports OpenAI-compatible chat comp
 Responses API, streaming, tool-calling plumbing, structured output hints, typed image input
 references for Responses API calls, safe lifecycle events, optional Micrometer metrics, optional
 OpenTelemetry tracing, redacted payload diagnostics, Spring Boot auto-configuration, a configurable
-provider boundary, and in-memory testing support.
+provider boundary, Responses API function-tool plumbing, and in-memory testing support.
 
 The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
 Those remain roadmap items so the public API can evolve deliberately instead of exposing
@@ -125,6 +126,8 @@ import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
 import io.wangrollin.ai.response.ResponseTextFormat;
+import io.wangrollin.ai.response.ResponseTool;
+import io.wangrollin.ai.response.ResponseToolCall;
 
 import java.time.Duration;
 
@@ -478,8 +481,38 @@ System.out.println(imageSummary.text());
 ```
 
 For a previously uploaded provider file id, use `ResponseInputPart.imageFileId("file_...")`.
-Advanced provider features such as tool execution, background mode, and stored conversation
-management are left for later milestones.
+Responses API function tools use the same SDK boundary as chat tools: the SDK sends tool definitions
+and returns requested function calls, while the application owns trusted execution and result
+validation. Send the tool result back with the provider `call_id` and the previous response id:
+
+```java
+ResponseResult toolPlanning = responseClient.respond(ResponseRequest.builder()
+    .input("What is the weather in Shanghai?")
+    .tool(ResponseTool.function("lookup_weather", "Look up current weather by city.", """
+        {
+          "type": "object",
+          "properties": {
+            "city": { "type": "string" }
+          },
+          "required": ["city"],
+          "additionalProperties": false
+        }
+        """))
+    .build());
+
+for (ResponseToolCall toolCall : toolPlanning.toolCalls()) {
+    if ("lookup_weather".equals(toolCall.name())) {
+        ResponseResult finalResult = responseClient.respond(ResponseRequest.builder()
+            .previousResponseId(toolPlanning.id())
+            .functionCallOutput(toolCall.callId(), "{\"temperatureCelsius\":21}")
+            .build());
+        System.out.println(finalResult.text());
+    }
+}
+```
+
+Advanced provider features such as background mode and stored conversation management are left for
+later milestones.
 
 ## Spring Boot Starter
 

@@ -9,9 +9,11 @@ import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
 import io.wangrollin.ai.response.ResponseTextFormat;
+import io.wangrollin.ai.response.ResponseTool;
+import io.wangrollin.ai.response.ResponseToolCall;
 
 /**
- * Minimal Responses API example for text, structured output, image input, and streaming.
+ * Minimal Responses API example for text, structured output, image input, tools, and streaming.
  */
 public final class ResponsesExample {
     private ResponsesExample() {
@@ -53,6 +55,29 @@ public final class ResponsesExample {
                                 ResponseInputPart.ImageDetail.LOW)))
                 .build());
         System.out.println(imageSummary.text());
+
+        ResponseResult toolPlanning = client.respond(ResponseRequest.builder()
+                .input("What is the weather in Shanghai?")
+                .tool(ResponseTool.function("lookup_weather", "Look up current weather by city.", """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "city": { "type": "string" }
+                          },
+                          "required": ["city"],
+                          "additionalProperties": false
+                        }
+                        """))
+                .build());
+        for (ResponseToolCall toolCall : toolPlanning.toolCalls()) {
+            if ("lookup_weather".equals(toolCall.name())) {
+                ResponseResult finalResult = client.respond(ResponseRequest.builder()
+                        .previousResponseId(toolPlanning.id())
+                        .functionCallOutput(toolCall.callId(), "{\"temperatureCelsius\":21}")
+                        .build());
+                System.out.println(finalResult.text());
+            }
+        }
 
         try (ResponseStream stream = client.streamResponse(ResponseRequest.builder()
                 .input("Give me two short rollout checks.")

@@ -14,7 +14,7 @@ import java.util.Objects;
  * @param role message role
  * @param content ordered content parts
  */
-public record ResponseInputMessage(String role, List<ResponseInputPart> content) {
+public record ResponseInputMessage(String role, List<ResponseInputPart> content) implements ResponseInputItem {
     private static final String USER_ROLE = "user";
 
     /**

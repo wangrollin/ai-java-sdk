@@ -10,21 +10,23 @@ import java.util.Objects;
 public final class ResponseRequest {
     private final String model;
     private final String input;
-    private final List<ResponseInputMessage> inputMessages;
+    private final List<ResponseInputItem> inputItems;
     private final String instructions;
     private final Double temperature;
     private final Double topP;
     private final Integer maxOutputTokens;
     private final ResponseTextFormat textFormat;
+    private final String previousResponseId;
+    private final List<ResponseTool> tools;
 
     private ResponseRequest(Builder builder) {
         this.model = normalizeOptionalText(builder.model);
         this.input = builder.input == null ? null : requireText(builder.input, "input");
-        this.inputMessages = List.copyOf(builder.inputMessages);
-        if (this.input == null && this.inputMessages.isEmpty()) {
+        this.inputItems = List.copyOf(builder.inputItems);
+        if (this.input == null && this.inputItems.isEmpty()) {
             throw new IllegalArgumentException("input or inputMessages must be configured");
         }
-        if (this.input != null && !this.inputMessages.isEmpty()) {
+        if (this.input != null && !this.inputItems.isEmpty()) {
             throw new IllegalArgumentException("input and inputMessages cannot both be configured");
         }
         this.instructions = normalizeOptionalText(builder.instructions);
@@ -32,6 +34,8 @@ public final class ResponseRequest {
         this.topP = requireNonNegative(builder.topP, "topP");
         this.maxOutputTokens = requirePositive(builder.maxOutputTokens, "maxOutputTokens");
         this.textFormat = builder.textFormat;
+        this.previousResponseId = normalizeOptionalText(builder.previousResponseId);
+        this.tools = List.copyOf(builder.tools);
     }
 
     /**
@@ -67,7 +71,19 @@ public final class ResponseRequest {
      * @return immutable input message list
      */
     public List<ResponseInputMessage> inputMessages() {
-        return inputMessages;
+        return inputItems.stream()
+                .filter(ResponseInputMessage.class::isInstance)
+                .map(ResponseInputMessage.class::cast)
+                .toList();
+    }
+
+    /**
+     * Returns the typed Responses API input items, or an empty list when this request uses text input.
+     *
+     * @return immutable input item list
+     */
+    public List<ResponseInputItem> inputItems() {
+        return inputItems;
     }
 
     /**
@@ -116,17 +132,37 @@ public final class ResponseRequest {
     }
 
     /**
+     * Optional previous response id used when continuing a Responses API turn.
+     *
+     * @return optional provider response id
+     */
+    public String previousResponseId() {
+        return previousResponseId;
+    }
+
+    /**
+     * Optional function tools that the model may request during generation.
+     *
+     * @return immutable tool list
+     */
+    public List<ResponseTool> tools() {
+        return tools;
+    }
+
+    /**
      * Builder for {@link ResponseRequest}.
      */
     public static final class Builder {
         private String model;
         private String input;
-        private final List<ResponseInputMessage> inputMessages = new ArrayList<>();
+        private final List<ResponseInputItem> inputItems = new ArrayList<>();
         private String instructions;
         private Double temperature;
         private Double topP;
         private Integer maxOutputTokens;
         private ResponseTextFormat textFormat;
+        private String previousResponseId;
+        private final List<ResponseTool> tools = new ArrayList<>();
 
         private Builder() {
         }
@@ -160,7 +196,7 @@ public final class ResponseRequest {
          * @return this builder
          */
         public Builder inputMessage(ResponseInputMessage message) {
-            this.inputMessages.add(Objects.requireNonNull(message, "message must not be null"));
+            this.inputItems.add(Objects.requireNonNull(message, "message must not be null"));
             return this;
         }
 
@@ -173,6 +209,40 @@ public final class ResponseRequest {
         public Builder inputMessages(List<ResponseInputMessage> messages) {
             Objects.requireNonNull(messages, "messages must not be null");
             messages.forEach(this::inputMessage);
+            return this;
+        }
+
+        /**
+         * Adds one function-call output item to continue a prior Responses API turn.
+         *
+         * @param callId provider call id from {@link ResponseToolCall#callId()}
+         * @param output application-provided tool result text
+         * @return this builder
+         */
+        public Builder functionCallOutput(String callId, String output) {
+            return inputItem(new ResponseFunctionCallOutput(callId, output));
+        }
+
+        /**
+         * Adds one typed Responses API input item.
+         *
+         * @param item input item to append
+         * @return this builder
+         */
+        public Builder inputItem(ResponseInputItem item) {
+            this.inputItems.add(Objects.requireNonNull(item, "item must not be null"));
+            return this;
+        }
+
+        /**
+         * Adds multiple typed Responses API input items in list order.
+         *
+         * @param items input items to append
+         * @return this builder
+         */
+        public Builder inputItems(List<ResponseInputItem> items) {
+            Objects.requireNonNull(items, "items must not be null");
+            items.forEach(this::inputItem);
             return this;
         }
 
@@ -228,6 +298,40 @@ public final class ResponseRequest {
          */
         public Builder textFormat(ResponseTextFormat textFormat) {
             this.textFormat = requireNonNull(textFormat, "textFormat");
+            return this;
+        }
+
+        /**
+         * Sets the previous response id when sending tool results or continuing a turn.
+         *
+         * @param previousResponseId provider response id; blank values are treated as absent
+         * @return this builder
+         */
+        public Builder previousResponseId(String previousResponseId) {
+            this.previousResponseId = previousResponseId;
+            return this;
+        }
+
+        /**
+         * Adds one function tool that the provider may ask the application to execute.
+         *
+         * @param tool tool definition to advertise
+         * @return this builder
+         */
+        public Builder tool(ResponseTool tool) {
+            this.tools.add(Objects.requireNonNull(tool, "tool must not be null"));
+            return this;
+        }
+
+        /**
+         * Adds multiple tools in list order.
+         *
+         * @param tools tools to advertise
+         * @return this builder
+         */
+        public Builder tools(List<ResponseTool> tools) {
+            Objects.requireNonNull(tools, "tools must not be null");
+            tools.forEach(this::tool);
             return this;
         }
 

@@ -16,6 +16,7 @@ import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseStream;
 import io.wangrollin.ai.response.ResponseTextFormat;
+import io.wangrollin.ai.response.ResponseTool;
 import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -166,6 +167,46 @@ class AiResponseClientTest {
         assertEquals("risk_summary", format.path("name").asText());
         assertEquals("object", format.path("schema").path("type").asText());
         assertTrue(format.path("strict").asBoolean());
+    }
+
+    @Test
+    void sendsResponseToolsAndFunctionCallOutput() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"output_text":"It is 21 C in Shanghai."}
+                    """);
+        });
+
+        ResponseResult result = testClient().respond(ResponseRequest.builder()
+                .previousResponseId("resp_123")
+                .functionCallOutput("call_123", "{\"temperatureCelsius\":21}")
+                .tool(ResponseTool.function("lookup_weather", "Look up weather by city.", """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "city": { "type": "string" }
+                          },
+                          "required": ["city"],
+                          "additionalProperties": false
+                        }
+                        """))
+                .build());
+
+        assertEquals("It is 21 C in Shanghai.", result.text());
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        JsonNode input = requestJson.path("input").path(0);
+        JsonNode tool = requestJson.path("tools").path(0);
+        assertEquals("resp_123", requestJson.path("previous_response_id").asText());
+        assertEquals("function_call_output", input.path("type").asText());
+        assertEquals("call_123", input.path("call_id").asText());
+        assertEquals("{\"temperatureCelsius\":21}", input.path("output").asText());
+        assertEquals("function", tool.path("type").asText());
+        assertEquals("lookup_weather", tool.path("name").asText());
+        assertEquals("Look up weather by city.", tool.path("description").asText());
+        assertEquals("object", tool.path("parameters").path("type").asText());
+        assertFalse(tool.has("strict"));
     }
 
     @Test

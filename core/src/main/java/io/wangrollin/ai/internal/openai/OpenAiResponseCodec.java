@@ -5,14 +5,20 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.response.ResponseDelta;
+import io.wangrollin.ai.response.ResponseFunctionCallOutput;
+import io.wangrollin.ai.response.ResponseInputItem;
 import io.wangrollin.ai.response.ResponseInputMessage;
 import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseTextFormat;
+import io.wangrollin.ai.response.ResponseTool;
+import io.wangrollin.ai.response.ResponseToolCall;
 import io.wangrollin.ai.response.ResponseUsage;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -49,15 +55,17 @@ public final class OpenAiResponseCodec {
         try {
             JsonNode root = objectMapper.readTree(body);
             String text = outputText(root);
-            if (text == null) {
+            List<ResponseToolCall> toolCalls = toolCalls(root.path("output"));
+            if (text == null && toolCalls.isEmpty()) {
                 throw new AiException("Response did not contain output text");
             }
             return new ResponseResult(
-                    text,
+                    text == null ? "" : text,
                     optionalText(root.path("id")),
                     optionalText(root.path("model")),
                     optionalText(root.path("status")),
-                    usage(root.path("usage")));
+                    usage(root.path("usage")),
+                    toolCalls);
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse response", e);
         }
@@ -78,6 +86,12 @@ public final class OpenAiResponseCodec {
             }
             if ("response.completed".equals(type)) {
                 return new ResponseDelta("", true);
+            }
+            if ("response.output_item.done".equals(type)) {
+                ResponseToolCall toolCall = toolCall(root.path("item"));
+                if (toolCall != null) {
+                    return new ResponseDelta("", false, List.of(toolCall));
+                }
             }
             return new ResponseDelta("", false);
         } catch (JsonProcessingException e) {
@@ -114,6 +128,12 @@ public final class OpenAiResponseCodec {
         putIfPresent(payload, "top_p", request.topP());
         putIfPresent(payload, "max_output_tokens", request.maxOutputTokens());
         putIfPresent(payload, "text", textPayload(request.textFormat()));
+        putIfPresent(payload, "previous_response_id", request.previousResponseId());
+        if (!request.tools().isEmpty()) {
+            payload.put("tools", request.tools().stream()
+                    .map(this::toolPayload)
+                    .toList());
+        }
         if (stream) {
             payload.put("stream", true);
         }
@@ -124,9 +144,19 @@ public final class OpenAiResponseCodec {
         if (request.input() != null) {
             return request.input();
         }
-        return request.inputMessages().stream()
-                .map(OpenAiResponseCodec::inputMessagePayload)
+        return request.inputItems().stream()
+                .map(OpenAiResponseCodec::inputItemPayload)
                 .toList();
+    }
+
+    private static Map<String, Object> inputItemPayload(ResponseInputItem item) {
+        if (item instanceof ResponseInputMessage message) {
+            return inputMessagePayload(message);
+        }
+        if (item instanceof ResponseFunctionCallOutput output) {
+            return functionCallOutputPayload(output);
+        }
+        throw new AiException("Unsupported response input item: " + item.getClass().getName());
     }
 
     private static Map<String, Object> inputMessagePayload(ResponseInputMessage message) {
@@ -135,6 +165,14 @@ public final class OpenAiResponseCodec {
         payload.put("content", message.content().stream()
                 .map(OpenAiResponseCodec::inputPartPayload)
                 .toList());
+        return payload;
+    }
+
+    private static Map<String, Object> functionCallOutputPayload(ResponseFunctionCallOutput output) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", "function_call_output");
+        payload.put("call_id", output.callId());
+        payload.put("output", output.output());
         return payload;
     }
 
@@ -156,6 +194,16 @@ public final class OpenAiResponseCodec {
                 putIfPresent(payload, "detail", part.detailValue());
             }
         }
+        return payload;
+    }
+
+    private Map<String, Object> toolPayload(ResponseTool tool) {
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("type", "function");
+        payload.put("name", tool.name());
+        putIfPresent(payload, "description", tool.description());
+        payload.put("parameters", parseJsonObject(tool.parametersJson()));
+        putIfPresent(payload, "strict", tool.strict());
         return payload;
     }
 
@@ -232,6 +280,36 @@ public final class OpenAiResponseCodec {
 
     private static String optionalText(JsonNode node) {
         return node.isTextual() ? node.asText() : null;
+    }
+
+    private static List<ResponseToolCall> toolCalls(JsonNode node) {
+        if (!node.isArray()) {
+            return List.of();
+        }
+        List<ResponseToolCall> toolCalls = new ArrayList<>();
+        for (JsonNode item : node) {
+            ResponseToolCall toolCall = toolCall(item);
+            if (toolCall != null) {
+                toolCalls.add(toolCall);
+            }
+        }
+        return List.copyOf(toolCalls);
+    }
+
+    private static ResponseToolCall toolCall(JsonNode item) {
+        if (!"function_call".equals(optionalText(item.path("type")))) {
+            return null;
+        }
+        String callId = optionalText(item.path("call_id"));
+        String name = optionalText(item.path("name"));
+        if (callId == null || name == null) {
+            return null;
+        }
+        return new ResponseToolCall(
+                optionalText(item.path("id")),
+                callId,
+                name,
+                optionalText(item.path("arguments")));
     }
 
     private static void putIfPresent(Map<String, Object> payload, String name, Object value) {

@@ -108,7 +108,7 @@ public final class ResponseStream implements AutoCloseable, Iterable<ResponseDel
                     close();
                     return null;
                 }
-                if (!delta.text().isEmpty()) {
+                if (!delta.text().isEmpty() || !delta.toolCalls().isEmpty()) {
                     return delta;
                 }
             }

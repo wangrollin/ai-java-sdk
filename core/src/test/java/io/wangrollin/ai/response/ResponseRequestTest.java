@@ -31,7 +31,35 @@ class ResponseRequestTest {
 
         assertNull(request.input());
         assertEquals(List.of(message), request.inputMessages());
+        assertEquals(List.of(message), request.inputItems());
         assertEquals("low", message.content().get(1).detailValue());
+    }
+
+    @Test
+    void buildsToolContinuationRequest() {
+        ResponseFunctionCallOutput output = new ResponseFunctionCallOutput("call_123", "{\"temperature\":21}");
+        ResponseTool tool = ResponseTool.function("lookup_weather", "Look up weather by city.", """
+                {
+                  "type": "object",
+                  "properties": {
+                    "city": { "type": "string" }
+                  },
+                  "required": ["city"],
+                  "additionalProperties": false
+                }
+                """, true);
+
+        ResponseRequest request = ResponseRequest.builder()
+                .previousResponseId("resp_123")
+                .inputItem(output)
+                .tool(tool)
+                .build();
+
+        assertNull(request.input());
+        assertEquals(List.of(output), request.inputItems());
+        assertEquals(List.of(), request.inputMessages());
+        assertEquals("resp_123", request.previousResponseId());
+        assertEquals(List.of(tool), request.tools());
     }
 
     @Test
@@ -70,6 +98,14 @@ class ResponseRequestTest {
         assertThrows(IllegalArgumentException.class, () -> ResponseInputPart.imageUrl(""));
         assertThrows(IllegalArgumentException.class, () -> ResponseInputPart.imageFileId(" "));
         assertThrows(IllegalArgumentException.class, () -> ResponseInputMessage.user(List.of()));
+    }
+
+    @Test
+    void rejectsInvalidResponseToolsAndFunctionOutputs() {
+        assertThrows(IllegalArgumentException.class, () -> ResponseTool.function(" ", "{}"));
+        assertThrows(IllegalArgumentException.class, () -> ResponseTool.function("lookup", "[]"));
+        assertThrows(IllegalArgumentException.class, () -> new ResponseFunctionCallOutput(" ", "{}"));
+        assertThrows(IllegalArgumentException.class, () -> new ResponseFunctionCallOutput("call_123", " "));
     }
 
     @Test

@@ -9,8 +9,12 @@ import io.wangrollin.ai.response.ResponseInputPart;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import io.wangrollin.ai.response.ResponseTextFormat;
+import io.wangrollin.ai.response.ResponseTool;
+import io.wangrollin.ai.response.ResponseToolCall;
 import io.wangrollin.ai.response.ResponseUsage;
 import org.junit.jupiter.api.Test;
+
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
@@ -130,6 +134,37 @@ class OpenAiResponseCodecTest {
     }
 
     @Test
+    void serializesResponseToolsAndFunctionCallOutput() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .previousResponseId("resp_123")
+                .functionCallOutput("call_123", "{\"temperatureCelsius\":21}")
+                .tool(ResponseTool.function("lookup_weather", "Look up weather by city.", """
+                        {
+                          "type": "object",
+                          "properties": {
+                            "city": { "type": "string" }
+                          },
+                          "required": ["city"],
+                          "additionalProperties": false
+                        }
+                        """, true))
+                .build(), "default-model", false);
+
+        JsonNode json = OBJECT_MAPPER.readTree(body);
+        JsonNode output = json.path("input").path(0);
+        JsonNode tool = json.path("tools").path(0);
+        assertEquals("resp_123", json.path("previous_response_id").asText());
+        assertEquals("function_call_output", output.path("type").asText());
+        assertEquals("call_123", output.path("call_id").asText());
+        assertEquals("{\"temperatureCelsius\":21}", output.path("output").asText());
+        assertEquals("function", tool.path("type").asText());
+        assertEquals("lookup_weather", tool.path("name").asText());
+        assertEquals("Look up weather by city.", tool.path("description").asText());
+        assertEquals("object", tool.path("parameters").path("type").asText());
+        assertTrue(tool.path("strict").asBoolean());
+    }
+
+    @Test
     void parsesOutputTextAndUsage() {
         ResponseResult result = codec.parseResponse("""
                 {
@@ -172,6 +207,32 @@ class OpenAiResponseCodecTest {
     }
 
     @Test
+    void parsesFunctionToolCalls() {
+        ResponseResult result = codec.parseResponse("""
+                {
+                  "id": "resp_123",
+                  "output": [
+                    {
+                      "type": "function_call",
+                      "id": "fc_123",
+                      "call_id": "call_123",
+                      "name": "lookup_weather",
+                      "arguments": "{\\"city\\":\\"Shanghai\\"}"
+                    }
+                  ]
+                }
+                """);
+
+        assertEquals("", result.text());
+        assertEquals("resp_123", result.id());
+        assertEquals(List.of(new ResponseToolCall(
+                "fc_123",
+                "call_123",
+                "lookup_weather",
+                "{\"city\":\"Shanghai\"}")), result.toolCalls());
+    }
+
+    @Test
     void rejectsMissingText() {
         AiException exception = assertThrows(AiException.class, () -> codec.parseResponse("""
                 {"output":[]}
@@ -191,6 +252,28 @@ class OpenAiResponseCodecTest {
         assertEquals(new ResponseDelta("", false), codec.parseStreamDelta("""
                 {"type":"response.created"}
                 """));
+    }
+
+    @Test
+    void parsesStreamFunctionToolCall() {
+        assertEquals(
+                new ResponseDelta("", false, List.of(new ResponseToolCall(
+                        "fc_123",
+                        "call_123",
+                        "lookup_weather",
+                        "{\"city\":\"Shanghai\"}"))),
+                codec.parseStreamDelta("""
+                        {
+                          "type": "response.output_item.done",
+                          "item": {
+                            "type": "function_call",
+                            "id": "fc_123",
+                            "call_id": "call_123",
+                            "name": "lookup_weather",
+                            "arguments": "{\\"city\\":\\"Shanghai\\"}"
+                          }
+                        }
+                        """));
     }
 
     @Test
