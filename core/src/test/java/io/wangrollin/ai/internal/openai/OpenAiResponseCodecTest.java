@@ -33,6 +33,7 @@ class OpenAiResponseCodecTest {
                 .temperature(0.2)
                 .topP(0.9)
                 .maxOutputTokens(64)
+                .background(true)
                 .build(), "default-model", true);
 
         JsonNode json = OBJECT_MAPPER.readTree(body);
@@ -42,7 +43,18 @@ class OpenAiResponseCodecTest {
         assertEquals(0.2, json.path("temperature").asDouble());
         assertEquals(0.9, json.path("top_p").asDouble());
         assertEquals(64, json.path("max_output_tokens").asInt());
+        assertTrue(json.path("background").asBoolean());
         assertTrue(json.path("stream").asBoolean());
+    }
+
+    @Test
+    void omitsBackgroundModeByDefault() throws Exception {
+        String body = codec.serializeRequest(ResponseRequest.builder()
+                .input("Hello")
+                .build(), "default-model", false);
+
+        JsonNode json = OBJECT_MAPPER.readTree(body);
+        assertTrue(json.path("background").isMissingNode());
     }
 
     @Test

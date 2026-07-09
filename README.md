@@ -43,6 +43,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Tool-calling request and response plumbing for chat completions.
 - [x] Tool-calling request and response plumbing for Responses API calls.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
+- [x] Responses API image input references, function-tool plumbing, and background mode requests.
 - [x] Request/response diagnostics with conservative redaction.
 - [x] Safe lifecycle events, dependency-free metrics hooks, optional Micrometer metrics, and optional OpenTelemetry tracing.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
@@ -59,8 +60,9 @@ application code:
 - **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
   and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
   default telemetry.
-- **Responses API depth**: continue expanding beyond text, image input, and tool plumbing when the
-  public API shape is clear, including background mode and stored conversation management.
+- **Responses API depth**: continue expanding beyond text, image input, tool plumbing, and
+  background mode requests when the public API shape is clear, including stored conversation
+  management.
 - **Production hardening**: improve timeout and cancellation coverage, add compatibility tests for
   streaming edge cases, and keep release verification centered on `mvn verify` plus a clean working
   tree.
@@ -72,9 +74,10 @@ application code:
 
 The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
 Responses API, streaming, tool-calling plumbing, structured output hints, typed image input
-references for Responses API calls, safe lifecycle events, optional Micrometer metrics, optional
-OpenTelemetry tracing, redacted payload diagnostics, Spring Boot auto-configuration, a configurable
-provider boundary, Responses API function-tool plumbing, and in-memory testing support.
+references and background mode requests for Responses API calls, safe lifecycle events, optional
+Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics, Spring Boot
+auto-configuration, a configurable provider boundary, Responses API function-tool plumbing, and
+in-memory testing support.
 
 The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
 Those remain roadmap items so the public API can evolve deliberately instead of exposing
@@ -481,6 +484,18 @@ System.out.println(imageSummary.text());
 ```
 
 For a previously uploaded provider file id, use `ResponseInputPart.imageFileId("file_...")`.
+When a provider supports Responses API background execution, the SDK can pass that request flag
+through without introducing a provider-specific polling abstraction:
+
+```java
+ResponseResult backgroundResult = responseClient.respond(ResponseRequest.builder()
+    .input("Prepare a concise incident review draft.")
+    .background(true)
+    .build());
+
+System.out.println(backgroundResult.id());
+```
+
 Responses API function tools use the same SDK boundary as chat tools: the SDK sends tool definitions
 and returns requested function calls, while the application owns trusted execution and result
 validation. Send the tool result back with the provider `call_id` and the previous response id:
@@ -511,8 +526,7 @@ for (ResponseToolCall toolCall : toolPlanning.toolCalls()) {
 }
 ```
 
-Advanced provider features such as background mode and stored conversation management are left for
-later milestones.
+Advanced provider features such as stored conversation management are left for later milestones.
 
 ## Spring Boot Starter
 

@@ -75,6 +75,7 @@ class AiResponseClientTest {
                 .temperature(0.2)
                 .topP(0.9)
                 .maxOutputTokens(64)
+                .background(true)
                 .build());
 
         assertEquals(new ResponseResult(
@@ -89,6 +90,7 @@ class AiResponseClientTest {
         assertEquals("Hello", requestJson.path("input").asText());
         assertEquals("Answer briefly.", requestJson.path("instructions").asText());
         assertEquals(64, requestJson.path("max_output_tokens").asInt());
+        assertTrue(requestJson.path("background").asBoolean());
     }
 
     @Test

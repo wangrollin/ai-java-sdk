@@ -17,6 +17,7 @@ class ResponseRequestTest {
 
         assertEquals("Describe the release risk.", request.input());
         assertEquals(List.of(), request.inputMessages());
+        assertNull(request.background());
     }
 
     @Test
@@ -51,6 +52,7 @@ class ResponseRequestTest {
 
         ResponseRequest request = ResponseRequest.builder()
                 .previousResponseId("resp_123")
+                .background(true)
                 .inputItem(output)
                 .tool(tool)
                 .build();
@@ -59,6 +61,7 @@ class ResponseRequestTest {
         assertEquals(List.of(output), request.inputItems());
         assertEquals(List.of(), request.inputMessages());
         assertEquals("resp_123", request.previousResponseId());
+        assertEquals(true, request.background());
         assertEquals(List.of(tool), request.tools());
     }
 

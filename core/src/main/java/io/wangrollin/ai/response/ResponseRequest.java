@@ -17,6 +17,7 @@ public final class ResponseRequest {
     private final Integer maxOutputTokens;
     private final ResponseTextFormat textFormat;
     private final String previousResponseId;
+    private final Boolean background;
     private final List<ResponseTool> tools;
 
     private ResponseRequest(Builder builder) {
@@ -35,6 +36,7 @@ public final class ResponseRequest {
         this.maxOutputTokens = requirePositive(builder.maxOutputTokens, "maxOutputTokens");
         this.textFormat = builder.textFormat;
         this.previousResponseId = normalizeOptionalText(builder.previousResponseId);
+        this.background = builder.background;
         this.tools = List.copyOf(builder.tools);
     }
 
@@ -141,6 +143,19 @@ public final class ResponseRequest {
     }
 
     /**
+     * Optional provider-side background execution flag.
+     *
+     * <p>When configured, the value is sent to the provider as-is. The SDK still exposes the same
+     * synchronous and streaming Java calls; applications remain responsible for any provider-specific
+     * follow-up workflow around background response ids.
+     *
+     * @return optional background execution flag
+     */
+    public Boolean background() {
+        return background;
+    }
+
+    /**
      * Optional function tools that the model may request during generation.
      *
      * @return immutable tool list
@@ -162,6 +177,7 @@ public final class ResponseRequest {
         private Integer maxOutputTokens;
         private ResponseTextFormat textFormat;
         private String previousResponseId;
+        private Boolean background;
         private final List<ResponseTool> tools = new ArrayList<>();
 
         private Builder() {
@@ -309,6 +325,21 @@ public final class ResponseRequest {
          */
         public Builder previousResponseId(String previousResponseId) {
             this.previousResponseId = previousResponseId;
+            return this;
+        }
+
+        /**
+         * Requests provider-side background execution for this Responses API call.
+         *
+         * <p>This is a narrow protocol option rather than an SDK async abstraction. The immediate
+         * client method still waits for the provider HTTP response according to the configured
+         * timeout, retry, and streaming behavior.
+         *
+         * @param background whether to ask the provider to run the response in the background
+         * @return this builder
+         */
+        public Builder background(boolean background) {
+            this.background = background;
             return this;
         }
 

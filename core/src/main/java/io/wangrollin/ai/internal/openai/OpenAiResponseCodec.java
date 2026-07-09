@@ -129,6 +129,7 @@ public final class OpenAiResponseCodec {
         putIfPresent(payload, "max_output_tokens", request.maxOutputTokens());
         putIfPresent(payload, "text", textPayload(request.textFormat()));
         putIfPresent(payload, "previous_response_id", request.previousResponseId());
+        putIfPresent(payload, "background", request.background());
         if (!request.tools().isEmpty()) {
             payload.put("tools", request.tools().stream()
                     .map(this::toolPayload)

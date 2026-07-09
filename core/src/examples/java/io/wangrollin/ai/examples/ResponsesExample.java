@@ -56,6 +56,12 @@ public final class ResponsesExample {
                 .build());
         System.out.println(imageSummary.text());
 
+        ResponseResult backgroundResult = client.respond(ResponseRequest.builder()
+                .input("Prepare a concise incident review draft.")
+                .background(true)
+                .build());
+        System.out.println(backgroundResult.id());
+
         ResponseResult toolPlanning = client.respond(ResponseRequest.builder()
                 .input("What is the weather in Shanghai?")
                 .tool(ResponseTool.function("lookup_weather", "Look up current weather by city.", """
