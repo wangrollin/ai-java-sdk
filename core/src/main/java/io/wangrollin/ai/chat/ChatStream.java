@@ -136,8 +136,8 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
             close();
             return null;
         } catch (IOException e) {
-            close();
             AiException exception = new AiException("Failed to read chat stream", e);
+            closeAfterFailure(exception);
             failureListener.accept(exception);
             throw exception;
         }
@@ -147,9 +147,19 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
         try {
             return deltaParser.apply(data);
         } catch (AiException e) {
-            close();
+            closeAfterFailure(e);
             failureListener.accept(e);
             throw e;
+        }
+    }
+
+    private void closeAfterFailure(AiException original) {
+        try {
+            close();
+        } catch (AiException closeFailure) {
+            // Preserve the stream read/parse failure as the primary signal and
+            // keep any cleanup problem available for diagnostics.
+            original.addSuppressed(closeFailure);
         }
     }
 }
