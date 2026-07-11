@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-11: Added a compiled Spring Boot `support-ticket-triage` workflow example that combines
+  structured JSON output, externalized starter configuration, metadata-only lifecycle logging, and
+  `FakeAiClient` tests for prompt assembly, schema requests, parsing failures, and SDK failures.
 - 2026-07-11: Added focused compatibility coverage for caller-side early stream close across chat streams, Responses streams, and lifecycle events; no production code change was needed because the current stream implementation already treats early close as normal cancellation.
 - 2026-07-11: Repositioned M2 around production Java backend adoption: Spring Boot workflow
   examples, testing support, safe observability, compatibility evidence, and explicit adoption
@@ -65,17 +68,17 @@ Completion criteria:
 - Provider presets can look like support promises unless backed by compatibility evidence.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
+- The first Spring Boot workflow example proves service-level integration, but it does not yet show
+  an HTTP controller or queue consumer boundary that many backend teams will expect.
 
 ## Next Candidates
 
-1. Add a Spring Boot `support-ticket-triage` workflow example that demonstrates structured output,
-   safe telemetry, provider configuration, and fake-client tests.
+1. Add a thin HTTP or queue boundary to the `support-ticket-triage` example so teams can see how the
+   SDK fits into an end-to-end backend request path without expanding SDK APIs.
 2. Add a README quick path that connects the first-screen value proposition to the Spring Boot
    workflow demo and fake-client testing story once those artifacts exist.
 3. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
    API behavior.
-4. Evaluate whether JDK 25 should remain the baseline or whether Java 17/21 would better match the
-   target adoption path.
 
 ## Long-Term Goal Review
 

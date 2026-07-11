@@ -61,6 +61,13 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Provider presets for common OpenAI-compatible model services.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
+## Spring Boot Workflow Example
+
+For a backend-oriented adoption path, see `examples/support-ticket-triage`. It is a small Spring
+Boot service example that uses the starter configuration, requests structured JSON output for
+support-ticket routing, wires metadata-only lifecycle logging, and tests the workflow with
+`FakeAiClient` instead of API keys or sockets.
+
 ## Roadmap
 
 Future work should prove that the SDK helps real Java backend teams adopt AI safely, not just expose

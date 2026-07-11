@@ -19,6 +19,7 @@
         <module>micrometer</module>
         <module>opentelemetry</module>
         <module>spring-boot-starter</module>
+        <module>examples/support-ticket-triage</module>
     </modules>
 
     <licenses>
@@ -65,6 +66,7 @@
         <maven-source-plugin.version>3.3.1</maven-source-plugin.version>
         <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
         <spring-boot.version>4.0.5</spring-boot.version>
+        <spring-framework.version>7.0.4</spring-framework.version>
         <assertj.version>3.27.7</assertj.version>
     </properties>
 
