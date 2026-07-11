@@ -80,6 +80,14 @@ class AiClientTest {
     }
 
     @Test
+    void rejectsNullProviderPreset() {
+        NullPointerException exception = assertThrows(NullPointerException.class, () -> AiClient.builder()
+                .providerPreset(null));
+
+        assertEquals("providerPreset must not be null", exception.getMessage());
+    }
+
+    @Test
     void createsUserMessage() {
         ChatMessage message = ChatMessage.user("Hello");
 
@@ -191,6 +199,32 @@ class AiClientTest {
                 .apiKey("test-key")
                 .provider(AiProvider.OPENAI_COMPATIBLE)
                 .baseUrl("http://localhost:" + server.getAddress().getPort())
+                .defaultModel("test-model")
+                .timeout(Duration.ofSeconds(5))
+                .build();
+
+        ChatResponse response = client.chat(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build());
+
+        assertEquals("ok", response.text());
+        assertEquals("/chat/completions", captured.get().path());
+    }
+
+    @Test
+    void explicitBaseUrlOverridesProviderPreset() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok"}}]}
+                    """);
+        });
+
+        AiClient client = AiClient.builder()
+                .apiKey("test-key")
+                .baseUrl("http://localhost:" + server.getAddress().getPort())
+                .providerPreset(AiProviderPreset.DEEPSEEK)
                 .defaultModel("test-model")
                 .timeout(Duration.ofSeconds(5))
                 .build();

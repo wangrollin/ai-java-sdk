@@ -6,6 +6,7 @@ import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.AiProviderPreset;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
 import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
@@ -86,6 +87,41 @@ class AiSdkAutoConfigurationTest {
         contextRunner
                 .withPropertyValues(requiredProperties())
                 .withPropertyValues("ai.sdk.provider=openai-compatible")
+                .run(context -> {
+                    String text = context.getBean(AiChatClient.class)
+                            .chat(ChatRequest.builder()
+                                    .message(ChatMessage.user("Hello"))
+                                    .build())
+                            .text();
+
+                    assertEquals("ok", text);
+                });
+    }
+
+    @Test
+    void bindsProviderPresetWithoutRequiringBaseUrl() {
+        contextRunner
+                .withPropertyValues(
+                        "ai.sdk.api-key=test-key",
+                        "ai.sdk.model=test-model",
+                        "ai.sdk.provider-preset=deepseek")
+                .run(context -> {
+                    AiSdkProperties properties = context.getBean(AiSdkProperties.class);
+
+                    assertEquals(AiProviderPreset.DEEPSEEK, properties.getProviderPreset());
+                    assertTrue(context.containsBean("aiClient"));
+                });
+    }
+
+    @Test
+    void explicitBaseUrlOverridesProviderPreset() throws Exception {
+        startServer(exchange -> respond(exchange, 200, """
+                {"choices":[{"message":{"content":"ok"}}]}
+                """));
+
+        contextRunner
+                .withPropertyValues(requiredProperties())
+                .withPropertyValues("ai.sdk.provider-preset=deepseek")
                 .run(context -> {
                     String text = context.getBean(AiChatClient.class)
                             .chat(ChatRequest.builder()

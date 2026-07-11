@@ -48,6 +48,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Safe lifecycle events, dependency-free metrics hooks, optional Micrometer metrics, and optional OpenTelemetry tracing.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
 - [x] Internal provider adapter boundary with OpenAI-compatible support as the default implementation.
+- [x] Provider presets for common OpenAI-compatible model services.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
 ## Roadmap
@@ -80,8 +81,8 @@ auto-configuration, a configurable provider boundary, Responses API function-too
 in-memory testing support.
 
 The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
-Those remain roadmap items so the public API can evolve deliberately instead of exposing
-provider-specific details too early.
+Provider presets cover common OpenAI-compatible model services without exposing provider-specific
+wire details too early.
 
 ## Requirements
 
@@ -528,6 +529,35 @@ for (ResponseToolCall toolCall : toolPlanning.toolCalls()) {
 
 Advanced provider features such as stored conversation management are left for later milestones.
 
+## Provider Compatibility
+
+`AiProviderPreset` provides documented base URLs for common model services that expose an
+OpenAI-compatible API. Presets set protocol and endpoint defaults only; applications still provide
+API keys and model names through environment-backed configuration.
+
+```java
+AiChatClient client = AiClient.builder()
+    .apiKey(System.getenv("DEEPSEEK_API_KEY"))
+    .providerPreset(AiProviderPreset.DEEPSEEK)
+    .defaultModel("deepseek-chat")
+    .build();
+```
+
+| Preset | Base URL | Initial support |
+| --- | --- | --- |
+| `OPENAI` | `https://api.openai.com/v1` | Chat Completions and Responses API |
+| `DEEPSEEK` | `https://api.deepseek.com` | OpenAI-compatible Chat Completions |
+| `QWEN` | `https://dashscope.aliyuncs.com/compatible-mode/v1` | OpenAI-compatible Chat Completions |
+| `MOONSHOT` | `https://api.moonshot.cn/v1` | OpenAI-compatible Chat Completions |
+| `ZHIPU` | `https://open.bigmodel.cn/api/paas/v4` | OpenAI-compatible Chat Completions |
+| `OPENROUTER` | `https://openrouter.ai/api/v1` | OpenAI-compatible Chat Completions |
+
+For non-OpenAI services, the first compatibility target is chat, streaming chat, tool calling, and
+JSON output hints through the OpenAI-compatible chat completions protocol. The SDK's Responses API
+client remains available, but providers that do not implement `/responses` may reject those calls.
+Use `baseUrl(...)` or `ai.sdk.base-url` when a provider account, region, proxy, or gateway requires
+a custom endpoint; explicit base URLs override preset defaults.
+
 ## Spring Boot Starter
 
 Spring Boot applications can add the starter module to get configuration binding and dependency
@@ -548,6 +578,7 @@ Do not commit real API keys to source control.
 ai.sdk.api-key=${OPENAI_API_KEY}
 ai.sdk.model=gpt-4.1-mini
 ai.sdk.provider=openai-compatible
+ai.sdk.provider-preset=openai
 ai.sdk.base-url=https://api.openai.com/v1
 ai.sdk.timeout=30s
 ai.sdk.retry.enabled=true
@@ -579,7 +610,8 @@ If the application defines `AiEventListener`, `AiPayloadDiagnosticsListener`, `A
 or `java.net.http.HttpClient` beans, the starter passes them into the SDK builder. Retry remains
 disabled unless `ai.sdk.retry.enabled=true` is set, matching the core SDK default behavior.
 `ai.sdk.provider` defaults to `openai-compatible`, so applications can omit it until they need to
-make provider protocol selection explicit across environments.
+make provider protocol selection explicit across environments. `ai.sdk.provider-preset` defaults to
+`openai`; when `ai.sdk.base-url` is also configured, the explicit base URL wins over the preset.
 
 ## Testing Support
 

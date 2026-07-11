@@ -2,6 +2,7 @@ package io.wangrollin.ai.spring.autoconfigure;
 
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiProvider;
+import io.wangrollin.ai.client.AiProviderPreset;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.time.Duration;
@@ -28,14 +29,19 @@ public class AiSdkProperties {
     private String model;
 
     /**
-     * OpenAI-compatible provider base URL.
+     * OpenAI-compatible provider base URL. When unset, the selected provider preset supplies the default.
      */
-    private String baseUrl = AiClient.DEFAULT_BASE_URL;
+    private String baseUrl;
 
     /**
      * Provider protocol used to translate SDK requests into provider HTTP payloads.
      */
     private AiProvider provider = AiProvider.OPENAI_COMPATIBLE;
+
+    /**
+     * Provider preset used to fill in protocol and base URL defaults.
+     */
+    private AiProviderPreset providerPreset = AiProviderPreset.OPENAI;
 
     /**
      * HTTP connection and request timeout.
@@ -79,6 +85,14 @@ public class AiSdkProperties {
         this.provider = provider == null ? AiProvider.OPENAI_COMPATIBLE : provider;
     }
 
+    public AiProviderPreset getProviderPreset() {
+        return providerPreset;
+    }
+
+    public void setProviderPreset(AiProviderPreset providerPreset) {
+        this.providerPreset = providerPreset == null ? AiProviderPreset.OPENAI : providerPreset;
+    }
+
     public Duration getTimeout() {
         return timeout;
     }
@@ -103,10 +117,6 @@ public class AiSdkProperties {
         return requireText(model, "ai.sdk.model");
     }
 
-    String requireBaseUrl() {
-        return requireText(baseUrl, "ai.sdk.base-url");
-    }
-
     Duration requireTimeout() {
         if (timeout == null) {
             throw new IllegalStateException("ai.sdk.timeout must not be null");
@@ -119,6 +129,13 @@ public class AiSdkProperties {
             throw new IllegalStateException("ai.sdk.provider must not be null");
         }
         return provider;
+    }
+
+    AiProviderPreset requireProviderPreset() {
+        if (providerPreset == null) {
+            throw new IllegalStateException("ai.sdk.provider-preset must not be null");
+        }
+        return providerPreset;
     }
 
     private static String requireText(String value, String propertyName) {

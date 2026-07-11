@@ -54,15 +54,14 @@ public final class AiClient implements AiChatClient, AiResponseClient {
 
     private AiClient(Builder builder) {
         this.apiKey = requireText(builder.apiKey, "apiKey");
-        this.baseUri = normalizeBaseUri(builder.baseUrl == null ? DEFAULT_BASE_URL : builder.baseUrl);
+        AiProviderPreset providerPreset = builder.providerPreset == null ? AiProviderPreset.OPENAI : builder.providerPreset;
+        this.baseUri = normalizeBaseUri(builder.baseUrl == null ? providerPreset.baseUrl() : builder.baseUrl);
         this.defaultModel = requireText(builder.defaultModel, "defaultModel");
         this.timeout = builder.timeout == null ? DEFAULT_TIMEOUT : builder.timeout;
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
         }
-        this.providerAdapter = providerAdapter(builder.provider == null
-                ? AiProvider.OPENAI_COMPATIBLE
-                : builder.provider);
+        this.providerAdapter = providerAdapter(builder.provider == null ? providerPreset.provider() : builder.provider);
         RetryPolicy retryPolicy = builder.retryPolicy == null ? RetryPolicy.none() : builder.retryPolicy;
         AiEventListener eventListener = builder.eventListener == null ? AiEventListener.NOOP : builder.eventListener;
         AiPayloadDiagnosticsListener payloadDiagnosticsListener = builder.payloadDiagnosticsListener == null
@@ -446,6 +445,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         private AiRedactionPolicy redactionPolicy;
         private HttpClient httpClient;
         private AiProvider provider;
+        private AiProviderPreset providerPreset;
 
         private Builder() {
         }
@@ -495,6 +495,22 @@ public final class AiClient implements AiChatClient, AiResponseClient {
          */
         public Builder provider(AiProvider provider) {
             this.provider = Objects.requireNonNull(provider, "provider must not be null");
+            return this;
+        }
+
+        /**
+         * Applies a known provider preset for OpenAI-compatible model services.
+         *
+         * <p>Presets fill in the protocol and base URL defaults only. They do
+         * not include API keys, default models, or provider-specific feature
+         * guarantees. A later or earlier explicit {@link #provider(AiProvider)}
+         * or {@link #baseUrl(String)} call wins for the field it configures.
+         *
+         * @param providerPreset provider preset to apply
+         * @return this builder
+         */
+        public Builder providerPreset(AiProviderPreset providerPreset) {
+            this.providerPreset = Objects.requireNonNull(providerPreset, "providerPreset must not be null");
             return this;
         }
 
