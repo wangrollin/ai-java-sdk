@@ -15,37 +15,49 @@ Outcome:
 - Configurable base URL, API key, model, timeout, and retry behavior.
 - Test utilities for mocking model responses in application tests.
 
-## M2 - Production Hardening and Provider Extensibility
+## M2 - Production Java Backend Adoption
 
 Status: in_progress
 
 Intent:
 
-- Strengthen behavior under production backend conditions.
-- Keep the provider boundary clear enough for future provider modules.
-- Improve observability and examples without compromising sensitive data safety.
+- Make the SDK's value clear to Java and Spring Boot backend teams within a short README scan.
+- Prove that the SDK helps teams ship AI features with safe observability, tests, and provider
+  configuration instead of only wrapping HTTP APIs.
+- Keep production reliability and provider boundaries strong while prioritizing adoption evidence.
 
 Focus areas:
 
-- Provider adapter documentation and tests.
-- Streaming, cancellation, timeout, and retry edge cases.
-- Optional metrics and tracing integrations that preserve conservative redaction defaults.
-- Release verification, migration notes, changelog discipline, and compiled examples.
+- A complete Spring Boot backend workflow demo, starting with a support-ticket triage service.
+- Testing guidance and fake-client capabilities for prompt assembly, structured output, failures,
+  tool calls, and streaming behavior.
+- Optional metrics, tracing, and redacted diagnostics that preserve conservative defaults.
+- Provider compatibility evidence for OpenAI-compatible chat, streaming, tool calling, JSON output,
+  and Responses API behavior.
+- Adoption readiness work such as README messaging, migration notes, release notes, and a JDK
+  baseline review.
 
 ## Later Candidate Milestones
 
-### Provider Expansion
+### Spring Boot Production Integration
 
-Add focused provider modules or presets when they provide real user value beyond the existing OpenAI-compatible path. Prefer narrow adapters over provider-specific public API spread.
+Deepen Spring Boot integration around configuration, dependency injection, actuator-style visibility,
+and application-level examples. The goal is to make a backend service demo feel like the natural
+first adoption path.
 
-### Responses API Depth
+### AI Testing Toolkit
 
-Expand Responses API support when the public shape is clear enough to model cleanly. Candidate areas include stored conversation management and additional multimodal or tool behaviors.
+Turn the in-memory fake into a stronger testing story for AI-integrated Java services. Candidate
+areas include request assertions, scripted failures, structured output fixtures, tool-call fixtures,
+streaming edge cases, and prompt regression examples.
 
-### Developer Experience and Adoption
+### Provider Compatibility and Routing
 
-Improve backend workflow examples, Spring Boot usage guidance, migration notes, and release documentation so teams can adopt the SDK with less reverse engineering.
+Add provider modules, presets, fallback, or routing only when they provide real user value beyond the
+existing OpenAI-compatible path. Compatibility matrices and tests should come before broad support
+claims.
 
-### Release Reliability
+### Production Control Plane
 
-Keep release readiness tied to repeatable verification, compiled examples, clean dependency boundaries, and documented compatibility expectations.
+Continue hardening timeout, cancellation, retry, streaming, error classification, metrics, tracing,
+redaction, and release verification so production behavior remains the project's main advantage.

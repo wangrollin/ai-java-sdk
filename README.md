@@ -4,24 +4,34 @@
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![Java](https://img.shields.io/badge/java-25%2B-orange.svg)](pom.xml)
 
-`ai-java-sdk` is a production-oriented Java SDK for building AI features in backend systems.
+`ai-java-sdk` is a production-ready Java SDK for adding AI calls to backend services without
+rebuilding retries, streaming cleanup, safe logs, metrics, tracing, tests, and provider
+configuration around every model integration.
 
-The goal of this project is not to be another thin wrapper around a model provider's HTTP API. It is intended to provide a Java-first foundation for teams that need reliable, observable, and maintainable AI integrations in real applications.
+The goal of this project is not to be another thin wrapper around a model provider's HTTP API. It is
+intended to give Java and Spring Boot teams a practical integration layer for reliable, observable,
+testable, and provider-flexible AI features in real backend systems.
 
 ## Why This Project Exists
 
-AI APIs are easy to call once, but harder to operate well in a Java backend. Production systems need more than request and response objects. They need predictable timeouts, retries, streaming behavior, typed models, safe logging, metrics, testing support, and clean integration with existing application frameworks.
+AI APIs are easy to call once, but harder to operate well in a Java backend. Production systems need
+more than request and response objects. They need predictable timeouts, retries, streaming behavior,
+typed models, safe logging, metrics, tracing, test doubles, and clean integration with Spring Boot
+configuration.
 
-`ai-java-sdk` aims to bring those concerns into one coherent SDK so Java teams can focus on product behavior instead of rebuilding the same infrastructure around every provider.
+`ai-java-sdk` aims to bring those concerns into one coherent SDK so Java teams can focus on product
+behavior instead of rebuilding the same infrastructure around every provider.
 
 ## Core Value
 
-- **Java-first API design**: provide clear, typed Java interfaces instead of raw maps and provider-specific JSON plumbing.
-- **Production readiness**: treat timeouts, retries, errors, cancellation, and resource management as first-class concerns.
-- **Stable streaming support**: make token streaming and event-style responses practical for backend services.
-- **Provider flexibility**: support OpenAI-compatible APIs first, with room for additional model providers over time.
-- **Operational visibility**: make logging, tracing, metrics, and request diagnostics easier to add safely.
-- **Framework integration**: provide a path toward Spring Boot-friendly configuration and dependency injection.
+- **Production-safe by default**: treat timeouts, retries, errors, streaming cleanup, and sensitive
+  telemetry as first-class SDK concerns.
+- **Spring Boot ready**: expose configuration binding and dependency injection so backend services
+  can adopt AI calls without custom wiring in every application.
+- **Test AI code without API calls**: provide narrow client interfaces and an in-memory fake so CI
+  can assert prompts, generation options, failures, and stream behavior without credentials.
+- **OpenAI-compatible provider switching**: support OpenAI-compatible APIs first, with presets and
+  compatibility evidence added only when they provide real backend adoption value.
 
 ## Completed Foundation
 
@@ -53,32 +63,28 @@ The SDK now includes the first production-oriented layers around that foundation
 
 ## Roadmap
 
-Future work should keep the SDK useful in production while avoiding provider-specific leakage in
-application code:
+Future work should prove that the SDK helps real Java backend teams adopt AI safely, not just expose
+more provider fields:
 
-- **Provider support**: build focused provider modules on top of the configurable provider boundary
-  while keeping OpenAI-compatible support as the default path.
-- **Observability**: continue expanding optional telemetry integrations beyond the Micrometer metrics
-  and OpenTelemetry bridges while keeping prompts, outputs, API keys, and raw provider bodies out of
-  default telemetry.
-- **Responses API depth**: continue expanding beyond text, image input, tool plumbing, and
-  background mode requests when the public API shape is clear, including stored conversation
-  management.
-- **Production hardening**: improve timeout and cancellation coverage, add compatibility tests for
-  streaming edge cases, and keep release verification centered on `mvn verify` plus a clean working
-  tree.
-- **Developer experience**: add complete backend workflow examples, maintain migration notes and a
-  changelog before future releases, and keep all examples compiled by the normal Maven verification
-  path.
+- **Backend workflow demo**: add a complete Spring Boot service example that combines structured
+  output, safe observability, provider configuration, and in-memory tests.
+- **Testing experience**: expand the fake client and examples so application tests can cover prompt
+  assembly, fallback behavior, tool calls, structured output, failures, and streaming errors.
+- **Compatibility evidence**: document which OpenAI-compatible providers have been verified for chat,
+  streaming, tool calling, JSON output, and Responses API behavior.
+- **Production control plane**: continue hardening timeout, cancellation, retry, telemetry, and
+  redaction behavior before adding broader provider-specific abstractions.
+- **Adoption readiness**: keep examples compiled, publish clear migration and release notes, and
+  evaluate whether the current JDK 25 requirement blocks the Java/Spring users this project is meant
+  to serve.
 
 ## Current Status
 
-The v0.1.0 foundation has been released. It supports OpenAI-compatible chat completions, the
-Responses API, streaming, tool-calling plumbing, structured output hints, typed image input
-references and background mode requests for Responses API calls, safe lifecycle events, optional
+The v0.1.0 foundation has been released. It already contains the production integration pieces that
+make the project more than a model API wrapper: OpenAI-compatible chat completions and Responses API
+clients, streaming, tool-calling plumbing, structured output hints, safe lifecycle events, optional
 Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics, Spring Boot
-auto-configuration, a configurable provider boundary, Responses API function-tool plumbing, and
-in-memory testing support.
+auto-configuration, provider presets, and in-memory testing support.
 
 The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
 Provider presets cover common OpenAI-compatible model services without exposing provider-specific
@@ -668,6 +674,11 @@ Small, compilable examples live in `core/src/examples/java/io/wangrollin/ai/exam
 - `MetricsListenerExample` collects safe request metrics from lifecycle events.
 - `PayloadDiagnosticsExample` enables opt-in redacted payload diagnostics.
 - `FakeAiClientExample` demonstrates in-memory test usage without API keys or sockets.
+
+The next adoption-focused example should be a small Spring Boot `support-ticket-triage` service that
+returns structured JSON such as category, urgency, summary, and suggested reply while demonstrating
+configuration-only provider switching, safe metrics/tracing, redacted diagnostics, and fake-client
+tests.
 
 The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
 keys, prompts containing private data, provider response bodies, or other sensitive values in the

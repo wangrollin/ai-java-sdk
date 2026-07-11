@@ -296,6 +296,38 @@ class AiResponseClientTest {
     }
 
     @Test
+    void closingResponseStreamEarlyStopsIterationWithoutFailure() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respondStream(exchange, """
+                    data: {"type":"response.output_text.delta","delta":"first"}
+
+                    data: {"type":"response.output_text.delta","delta":"ignored"}
+
+                    """);
+        });
+
+        try (ResponseStream stream = testClient().streamResponse(ResponseRequest.builder()
+                .input("Hello")
+                .build())) {
+            var iterator = stream.iterator();
+
+            assertTrue(iterator.hasNext());
+            assertEquals(new ResponseDelta("first", false), iterator.next());
+
+            // Treat caller-side early close as normal cancellation: no additional
+            // lazy reads should occur after the underlying response body closes.
+            stream.close();
+
+            assertFalse(iterator.hasNext());
+        }
+
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        assertTrue(requestJson.path("stream").asBoolean());
+    }
+
+    @Test
     void doesNotRetryAfterResponseStreamConsumptionStarts() throws Exception {
         AtomicInteger attempts = new AtomicInteger();
         startServer(exchange -> {

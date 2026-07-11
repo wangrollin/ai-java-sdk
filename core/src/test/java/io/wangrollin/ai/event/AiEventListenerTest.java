@@ -234,6 +234,38 @@ class AiEventListenerTest {
     }
 
     @Test
+    void closingStreamEarlyDoesNotEmitFailureEvent() throws Exception {
+        RecordingAiEventListener listener = new RecordingAiEventListener();
+        startServer(exchange -> respondStream(exchange, """
+                data: {"choices":[{"delta":{"content":"enough"},"finish_reason":null}]}
+
+                data: {"choices":[{"delta":{"content":"ignored"},"finish_reason":null}]}
+
+                """));
+
+        try (ChatStream stream = testClient(listener).stream(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build())) {
+            var iterator = stream.iterator();
+
+            assertTrue(iterator.hasNext());
+            assertEquals("enough", iterator.next().text());
+
+            // Closing early is caller-controlled cancellation, not a stream
+            // consumption failure, so the lifecycle listener should stay clean.
+            stream.close();
+
+            assertFalse(iterator.hasNext());
+        }
+
+        assertEquals(1, listener.started.size());
+        assertTrue(listener.started.get(0).stream());
+        assertEquals(1, listener.succeeded.size());
+        assertEquals("stream", listener.succeeded.get(0).operation());
+        assertTrue(listener.failed.isEmpty());
+    }
+
+    @Test
     void defaultNoopListenerDoesNotChangeBehavior() throws Exception {
         startServer(exchange -> respond(exchange, 200, """
                 {"choices":[{"message":{"content":"ok"}}]}

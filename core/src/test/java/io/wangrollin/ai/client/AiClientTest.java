@@ -747,6 +747,39 @@ class AiClientTest {
     }
 
     @Test
+    void closingChatStreamEarlyStopsIterationWithoutFailure() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respondStream(exchange, """
+                    data: {"choices":[{"delta":{"content":"first"},"finish_reason":null}]}
+
+                    data: {"choices":[{"delta":{"content":"ignored"},"finish_reason":null}]}
+
+                    """);
+        });
+
+        try (ChatStream stream = testClient().stream(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build())) {
+            var iterator = stream.iterator();
+
+            assertTrue(iterator.hasNext());
+            assertEquals(new ChatDelta("first", null), iterator.next());
+
+            // Early close represents caller-side cancellation after enough data
+            // has been received. It should stop lazy reads without surfacing a
+            // stream consumption failure.
+            stream.close();
+
+            assertFalse(iterator.hasNext());
+        }
+
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        assertTrue(requestJson.path("stream").asBoolean());
+    }
+
+    @Test
     void streamRequestModelOverridesClientDefaultModel() throws Exception {
         AtomicReference<CapturedRequest> captured = new AtomicReference<>();
         startServer(exchange -> {

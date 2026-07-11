@@ -61,3 +61,30 @@ Implications:
 - `docs/PROJECT_STATE.md` is the source of truth for the active milestone, risks, and next candidates.
 - `docs/ROADMAP.md` holds longer-term direction without becoming a detailed task tracker.
 - If a future change makes the current milestone less useful, record the reason and update the milestone rather than continuing by inertia.
+
+## 2026-07-11 - Focus on Java Backend Adoption
+
+Decision: The recommended project position is a production-ready Java and Spring Boot backend AI
+integration SDK, not a general agent framework, not an official SDK replacement, and not a race to
+list the most providers.
+
+Context:
+
+- The current codebase is strongest around backend integration concerns: safe lifecycle events,
+  redacted diagnostics, Micrometer metrics, OpenTelemetry tracing, Spring Boot auto-configuration,
+  retries, streaming behavior, provider presets, and in-memory testing.
+- Java backend teams are more likely to adopt the project because it reduces production integration
+  work than because it exposes every model-provider feature first.
+- Provider support has adoption value only when backed by compatibility evidence and stable public
+  APIs.
+
+Implications:
+
+- README messaging should lead with safe Java backend adoption, Spring Boot readiness, testability,
+  and OpenAI-compatible provider switching.
+- Near-term milestones should prioritize a realistic Spring Boot workflow demo, fake-client testing
+  guidance, observability examples, and provider compatibility matrices.
+- New provider work should avoid broad support claims until chat, streaming, tool calling, JSON
+  output, and Responses API behavior are verified.
+- Agent runtime abstractions, broad orchestration, and speculative provider-specific public APIs are
+  out of scope unless future user evidence justifies them.
