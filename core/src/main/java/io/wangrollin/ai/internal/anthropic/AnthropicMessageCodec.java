@@ -4,15 +4,20 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.wangrollin.ai.chat.ChatDelta;
-import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
-import io.wangrollin.ai.chat.ChatTool;
-import io.wangrollin.ai.chat.ChatToolCall;
-import io.wangrollin.ai.chat.ChatToolChoice;
-import io.wangrollin.ai.chat.ChatUsage;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.internal.protocol.AiContentBlock;
+import io.wangrollin.ai.internal.protocol.AiInputItem;
+import io.wangrollin.ai.internal.protocol.AiStreamEvent;
+import io.wangrollin.ai.internal.protocol.AiToolCall;
+import io.wangrollin.ai.internal.protocol.AiToolChoice;
+import io.wangrollin.ai.internal.protocol.AiToolSpec;
+import io.wangrollin.ai.internal.protocol.AiTurnRequest;
+import io.wangrollin.ai.internal.protocol.AiTurnResult;
+import io.wangrollin.ai.internal.protocol.AiUsage;
+import io.wangrollin.ai.internal.protocol.ProtocolMapper;
 
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -22,9 +27,8 @@ import java.util.Map;
 /**
  * Anthropic Claude Messages API JSON codec.
  *
- * <p>This codec deliberately maps only the provider-neutral chat surface that
- * the SDK can represent faithfully. Claude-specific conversation features stay
- * internal until the public API has a stable abstraction for them.
+ * <p>Claude's native content blocks and named SSE events are mapped to the internal
+ * neutral protocol here, keeping Claude wire details out of public SDK types.
  */
 public final class AnthropicMessageCodec {
     public static final String MESSAGES_PATH = "messages";
@@ -35,15 +39,11 @@ public final class AnthropicMessageCodec {
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Serializes a chat request into the Claude Messages payload.
-     *
-     * @param request chat request from the public SDK API
-     * @param defaultModel model to use when the request does not override it
-     * @param stream whether to request server-sent streaming events
-     * @return JSON request body
-     */
     public String serializeRequest(ChatRequest request, String defaultModel, boolean stream) {
+        return serializeRequest(ProtocolMapper.fromChatRequest(request), defaultModel, stream);
+    }
+
+    public String serializeRequest(AiTurnRequest request, String defaultModel, boolean stream) {
         try {
             return objectMapper.writeValueAsString(payload(request, defaultModel, stream));
         } catch (JsonProcessingException e) {
@@ -51,25 +51,24 @@ public final class AnthropicMessageCodec {
         }
     }
 
-    /**
-     * Parses a non-streaming Claude Messages response.
-     *
-     * @param body JSON response body
-     * @return SDK chat response
-     */
     public ChatResponse parseResponse(String body) {
+        return ProtocolMapper.toChatResponse(parseTurnResult(body));
+    }
+
+    public AiTurnResult parseTurnResult(String body) {
         try {
             JsonNode root = objectMapper.readTree(body);
-            List<ChatToolCall> toolCalls = toolCalls(root.path("content"));
+            List<AiToolCall> toolCalls = toolCalls(root.path("content"));
             String text = textContent(root.path("content"));
             if (text.isEmpty() && toolCalls.isEmpty()) {
                 throw new AiException("Anthropic response did not contain text or tool_use content");
             }
-            return new ChatResponse(
+            return new AiTurnResult(
                     text,
                     optionalText(root.path("id")),
                     optionalText(root.path("model")),
                     optionalText(root.path("stop_reason")),
+                    null,
                     usage(root.path("usage")),
                     toolCalls);
         } catch (JsonProcessingException e) {
@@ -77,12 +76,6 @@ public final class AnthropicMessageCodec {
         }
     }
 
-    /**
-     * Parses structured Anthropic error details when available.
-     *
-     * @param body JSON error response body
-     * @return structured provider error details, or {@code null}
-     */
     public AiError parseError(String body) {
         if (body == null || body.isBlank()) {
             return null;
@@ -92,10 +85,7 @@ public final class AnthropicMessageCodec {
             if (!error.isObject()) {
                 return null;
             }
-            AiError parsed = new AiError(
-                    optionalText(error.path("message")),
-                    optionalText(error.path("type")),
-                    null);
+            AiError parsed = new AiError(optionalText(error.path("message")), optionalText(error.path("type")), null);
             if (parsed.message() == null && parsed.type() == null) {
                 return null;
             }
@@ -105,49 +95,44 @@ public final class AnthropicMessageCodec {
         }
     }
 
-    /**
-     * Parses one Claude streaming event.
-     *
-     * @param event SSE event name
-     * @param data raw SSE data value
-     * @return SDK chat delta
-     */
     public ChatDelta parseStreamDelta(String event, String data) {
+        return ProtocolMapper.toChatDelta(parseStreamEvent(event, data));
+    }
+
+    public AiStreamEvent parseStreamEvent(String event, String data) {
         try {
             JsonNode root = objectMapper.readTree(data);
             if (TEXT_DELTA_EVENT.equals(event)) {
                 JsonNode delta = root.path("delta");
                 if ("text_delta".equals(optionalText(delta.path("type")))) {
-                    return new ChatDelta(optionalText(delta.path("text")), null);
+                    return AiStreamEvent.text(optionalText(delta.path("text")));
                 }
             }
             if (MESSAGE_DELTA_EVENT.equals(event)) {
-                return new ChatDelta("", optionalText(root.path("delta").path("stop_reason")));
+                return AiStreamEvent.done(optionalText(root.path("delta").path("stop_reason")));
             }
-            return new ChatDelta("", null);
+            return new AiStreamEvent("", false, null, List.of());
         } catch (JsonProcessingException e) {
             throw new AiException("Failed to parse Anthropic chat stream event", e);
         }
     }
 
-    private Map<String, Object> payload(ChatRequest request, String defaultModel, boolean stream) {
-        if (request.responseFormat() != null) {
+    private Map<String, Object> payload(AiTurnRequest request, String defaultModel, boolean stream) {
+        if (request.outputFormat() != null) {
             throw new AiException("Anthropic chat does not support ChatResponseFormat; use prompting or tools instead");
         }
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", request.model() == null ? defaultModel : request.model());
-        payload.put("max_tokens", request.maxTokens() == null ? DEFAULT_MAX_TOKENS : request.maxTokens());
-        putIfPresent(payload, "system", systemText(request.messages()));
-        payload.put("messages", messagePayloads(request.messages()));
+        payload.put("max_tokens", request.maxOutputTokens() == null ? DEFAULT_MAX_TOKENS : request.maxOutputTokens());
+        putIfPresent(payload, "system", systemText(request.inputItems()));
+        payload.put("messages", messagePayloads(request.inputItems()));
         putIfPresent(payload, "temperature", request.temperature());
         putIfPresent(payload, "top_p", request.topP());
         if (!request.stopSequences().isEmpty()) {
             payload.put("stop_sequences", request.stopSequences());
         }
         if (!request.tools().isEmpty()) {
-            payload.put("tools", request.tools().stream()
-                    .map(this::toolPayload)
-                    .toList());
+            payload.put("tools", request.tools().stream().map(this::toolPayload).toList());
         }
         putIfPresent(payload, "tool_choice", toolChoicePayload(request.toolChoice()));
         if (stream) {
@@ -156,30 +141,30 @@ public final class AnthropicMessageCodec {
         return payload;
     }
 
-    private String systemText(List<ChatMessage> messages) {
-        List<String> systemMessages = messages.stream()
-                .filter(message -> "system".equals(message.role()))
-                .map(ChatMessage::content)
+    private String systemText(List<AiInputItem> items) {
+        List<String> systemMessages = items.stream()
+                .filter(item -> item.kind() == AiInputItem.Kind.MESSAGE)
+                .filter(item -> "system".equals(item.role()))
+                .map(this::textContent)
+                .filter(text -> !text.isBlank())
                 .toList();
         return systemMessages.isEmpty() ? null : String.join("\n\n", systemMessages);
     }
 
-    private List<Map<String, Object>> messagePayloads(List<ChatMessage> messages) {
+    private List<Map<String, Object>> messagePayloads(List<AiInputItem> items) {
         List<Map<String, Object>> payloads = new ArrayList<>();
-        for (ChatMessage message : messages) {
-            if ("system".equals(message.role())) {
+        for (AiInputItem item : items) {
+            if (item.kind() == AiInputItem.Kind.MESSAGE && "system".equals(item.role())) {
                 continue;
             }
-            if ("tool".equals(message.role())) {
-                payloads.add(toolResultMessagePayload(message));
+            if (item.kind() == AiInputItem.Kind.TOOL_RESULT) {
+                payloads.add(Map.of("role", "user", "content", List.of(toolResultPayload(item))));
                 continue;
             }
-            if (!"user".equals(message.role()) && !"assistant".equals(message.role())) {
+            if (!"user".equals(item.role()) && !"assistant".equals(item.role())) {
                 throw new AiException("Anthropic chat supports only system, user, assistant, and tool messages");
             }
-            payloads.add(Map.of(
-                    "role", message.role(),
-                    "content", List.of(Map.of("type", "text", "text", message.content()))));
+            payloads.add(Map.of("role", item.role(), "content", contentPayload(item)));
         }
         if (payloads.isEmpty()) {
             throw new AiException("Anthropic chat requests require at least one non-system message");
@@ -187,15 +172,34 @@ public final class AnthropicMessageCodec {
         return payloads;
     }
 
-    private Map<String, Object> toolResultMessagePayload(ChatMessage message) {
+    private Map<String, Object> toolResultPayload(AiInputItem item) {
         Map<String, Object> result = new LinkedHashMap<>();
         result.put("type", "tool_result");
-        result.put("tool_use_id", message.toolCallId());
-        result.put("content", message.content());
-        return Map.of("role", "user", "content", List.of(result));
+        result.put("tool_use_id", item.toolCallId());
+        result.put("content", item.toolOutput());
+        return result;
     }
 
-    private Map<String, Object> toolPayload(ChatTool tool) {
+    private List<Map<String, Object>> contentPayload(AiInputItem item) {
+        return item.content().stream().map(block -> {
+            if (block.kind() != AiContentBlock.Kind.TEXT) {
+                throw new AiException("Anthropic chat adapter currently supports text message blocks only");
+            }
+            Map<String, Object> payload = new LinkedHashMap<>();
+            payload.put("type", "text");
+            payload.put("text", block.text());
+            return payload;
+        }).toList();
+    }
+
+    private String textContent(AiInputItem item) {
+        return item.content().stream()
+                .filter(block -> block.kind() == AiContentBlock.Kind.TEXT)
+                .map(AiContentBlock::text)
+                .reduce("", String::concat);
+    }
+
+    private Map<String, Object> toolPayload(AiToolSpec tool) {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("name", tool.name());
         putIfPresent(payload, "description", tool.description());
@@ -203,7 +207,7 @@ public final class AnthropicMessageCodec {
         return payload;
     }
 
-    private Object toolChoicePayload(ChatToolChoice toolChoice) {
+    private Object toolChoicePayload(AiToolChoice toolChoice) {
         if (toolChoice == null) {
             return null;
         }
@@ -237,17 +241,15 @@ public final class AnthropicMessageCodec {
         return String.join("", parts);
     }
 
-    private List<ChatToolCall> toolCalls(JsonNode content) {
+    private List<AiToolCall> toolCalls(JsonNode content) {
         if (!content.isArray()) {
             return List.of();
         }
-        List<ChatToolCall> calls = new ArrayList<>();
+        List<AiToolCall> calls = new ArrayList<>();
         for (JsonNode block : content) {
             if ("tool_use".equals(optionalText(block.path("type")))) {
-                calls.add(new ChatToolCall(
-                        optionalText(block.path("id")),
-                        optionalText(block.path("name")),
-                        compactJson(block.path("input"))));
+                String id = optionalText(block.path("id"));
+                calls.add(new AiToolCall(id, id, optionalText(block.path("name")), compactJson(block.path("input"))));
             }
         }
         return calls;
@@ -261,14 +263,14 @@ public final class AnthropicMessageCodec {
         }
     }
 
-    private ChatUsage usage(JsonNode node) {
+    private AiUsage usage(JsonNode node) {
         if (!node.isObject()) {
             return null;
         }
         Integer inputTokens = optionalInt(node.path("input_tokens"));
         Integer outputTokens = optionalInt(node.path("output_tokens"));
         Integer totalTokens = inputTokens == null || outputTokens == null ? null : inputTokens + outputTokens;
-        return new ChatUsage(inputTokens, outputTokens, totalTokens);
+        return new AiUsage(inputTokens, outputTokens, totalTokens);
     }
 
     private static void putIfPresent(Map<String, Object> payload, String name, Object value) {

@@ -48,6 +48,28 @@ Implications:
 - `AiResponseClient` stays OpenAI-compatible only unless a provider exposes the Responses API protocol.
 - Provider adapters own protocol-specific headers, endpoint paths, JSON payloads, and stream event parsing.
 
+## 2026-07-12 - Use a Neutral Internal Turn Protocol
+
+Decision: Provider adapters should translate through an internal typed content block, tool-call, and
+stream-event protocol instead of binding SDK internals to Chat Completions, OpenAI Responses, or
+Claude Messages directly.
+
+Context:
+
+- The SDK now supports multiple provider wire shapes with overlapping but different concepts:
+  chat messages, Responses typed input items, Claude content blocks, function tools, tool results,
+  and named streaming events.
+- Public `chat` and `response` APIs remain useful compatibility facades, but using either one as
+  the adapter SPI would make the other protocols look like second-class translations.
+
+Implications:
+
+- Public API requests should map into the neutral internal protocol before provider serialization.
+- Provider-specific wire details should remain in focused adapters for chat completions, Responses,
+  and Claude Messages.
+- New provider work should extend the neutral protocol only for stable SDK concepts, not for raw
+  provider JSON escape hatches by default.
+
 ## 2026-07-11 - Observability Must Be Conservative by Default
 
 Decision: Default lifecycle events, metrics, tracing, and diagnostics must not expose API keys, prompts, model outputs, tool arguments, or raw provider response bodies.

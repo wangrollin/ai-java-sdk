@@ -1,14 +1,11 @@
 package io.wangrollin.ai.internal.provider;
 
-import io.wangrollin.ai.chat.ChatDelta;
-import io.wangrollin.ai.chat.ChatRequest;
-import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.error.AiError;
-import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
-import io.wangrollin.ai.internal.openai.OpenAiResponseCodec;
-import io.wangrollin.ai.response.ResponseDelta;
-import io.wangrollin.ai.response.ResponseRequest;
-import io.wangrollin.ai.response.ResponseResult;
+import io.wangrollin.ai.internal.chat_completions_adapter.ChatCompletionsAdapter;
+import io.wangrollin.ai.internal.protocol.AiStreamEvent;
+import io.wangrollin.ai.internal.protocol.AiTurnRequest;
+import io.wangrollin.ai.internal.protocol.AiTurnResult;
+import io.wangrollin.ai.internal.responses_adapter.ResponsesAdapter;
 
 import java.util.Map;
 
@@ -20,15 +17,15 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
     private static final String CHAT_STREAM_OPERATION = "stream";
     private static final String RESPONSE_OPERATION = "response";
     private static final String RESPONSE_STREAM_OPERATION = "response.stream";
-    private static final String CHAT_PATH = "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH;
-    private static final String RESPONSES_PATH = "/" + OpenAiResponseCodec.RESPONSES_PATH;
+    private static final String CHAT_PATH = "/" + ChatCompletionsAdapter.PATH;
+    private static final String RESPONSES_PATH = "/" + ResponsesAdapter.PATH;
     private static final Map<String, String> AUTH_HEADERS = Map.of("Authorization", "Bearer {apiKey}");
 
-    private final OpenAiChatCodec chatCodec = new OpenAiChatCodec();
-    private final OpenAiResponseCodec responseCodec = new OpenAiResponseCodec();
+    private final ChatCompletionsAdapter chatCompletionsAdapter = new ChatCompletionsAdapter();
+    private final ResponsesAdapter responsesAdapter = new ResponsesAdapter();
 
     @Override
-    public ProviderRequestSpec chatRequest(ChatRequest request, String defaultModel, boolean stream) {
+    public ProviderRequestSpec chatRequest(AiTurnRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
         return new ProviderRequestSpec(
                 stream ? CHAT_STREAM_OPERATION : CHAT_OPERATION,
@@ -36,21 +33,21 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
                 model,
                 stream,
                 AUTH_HEADERS,
-                chatCodec.serializeRequest(request, defaultModel, stream));
+                chatCompletionsAdapter.serializeRequest(request, defaultModel, stream));
     }
 
     @Override
-    public ChatResponse parseChatResponse(String body) {
-        return chatCodec.parseResponse(body);
+    public AiTurnResult parseChatTurnResult(String body) {
+        return chatCompletionsAdapter.parseTurnResult(body);
     }
 
     @Override
-    public ChatDelta parseChatStreamDelta(String data) {
-        return chatCodec.parseStreamDelta(data);
+    public AiStreamEvent parseChatStreamEvent(String data) {
+        return chatCompletionsAdapter.parseStreamEvent(data);
     }
 
     @Override
-    public ProviderRequestSpec responseRequest(ResponseRequest request, String defaultModel, boolean stream) {
+    public ProviderRequestSpec responseRequest(AiTurnRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
         return new ProviderRequestSpec(
                 stream ? RESPONSE_STREAM_OPERATION : RESPONSE_OPERATION,
@@ -58,21 +55,21 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
                 model,
                 stream,
                 AUTH_HEADERS,
-                responseCodec.serializeRequest(request, defaultModel, stream));
+                responsesAdapter.serializeRequest(request, defaultModel, stream));
     }
 
     @Override
-    public ResponseResult parseResponseResult(String body) {
-        return responseCodec.parseResponse(body);
+    public AiTurnResult parseResponseTurnResult(String body) {
+        return responsesAdapter.parseTurnResult(body);
     }
 
     @Override
-    public ResponseDelta parseResponseStreamDelta(String data) {
-        return responseCodec.parseStreamDelta(data);
+    public AiStreamEvent parseResponseStreamEvent(String data) {
+        return responsesAdapter.parseStreamEvent(data);
     }
 
     @Override
     public AiError parseError(String body) {
-        return chatCodec.parseError(body);
+        return chatCompletionsAdapter.parseError(body);
     }
 }

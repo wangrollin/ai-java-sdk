@@ -3,18 +3,24 @@ package io.wangrollin.ai.internal.openai;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.wangrollin.ai.error.AiError;
-import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.chat.ChatDelta;
-import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
-import io.wangrollin.ai.chat.ChatResponseFormat;
-import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
-import io.wangrollin.ai.chat.ChatToolChoice;
-import io.wangrollin.ai.chat.ChatUsage;
+import io.wangrollin.ai.error.AiError;
+import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.internal.protocol.AiInputItem;
+import io.wangrollin.ai.internal.protocol.AiOutputFormat;
+import io.wangrollin.ai.internal.protocol.AiStreamEvent;
+import io.wangrollin.ai.internal.protocol.AiToolCall;
+import io.wangrollin.ai.internal.protocol.AiToolChoice;
+import io.wangrollin.ai.internal.protocol.AiToolSpec;
+import io.wangrollin.ai.internal.protocol.AiTurnRequest;
+import io.wangrollin.ai.internal.protocol.AiTurnResult;
+import io.wangrollin.ai.internal.protocol.AiUsage;
+import io.wangrollin.ai.internal.protocol.ProtocolMapper;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -22,23 +28,19 @@ import java.util.Map;
 /**
  * OpenAI-compatible chat completions JSON codec.
  *
- * <p>This class is intentionally internal: public SDK types stay provider-neutral
- * while this package owns the wire shape needed by OpenAI-compatible endpoints.
+ * <p>This class is intentionally internal: public SDK types are first mapped into the
+ * provider-neutral turn protocol, and only this codec knows the final chat-completions wire shape.
  */
 public final class OpenAiChatCodec {
     public static final String CHAT_COMPLETIONS_PATH = "chat/completions";
 
     private final ObjectMapper objectMapper = new ObjectMapper();
 
-    /**
-     * Serializes a chat request into the OpenAI-compatible chat completions payload.
-     *
-     * @param request chat request from the public SDK API
-     * @param defaultModel model to use when the request does not override it
-     * @param stream whether to request server-sent streaming events
-     * @return JSON request body
-     */
     public String serializeRequest(ChatRequest request, String defaultModel, boolean stream) {
+        return serializeRequest(ProtocolMapper.fromChatRequest(request), defaultModel, stream);
+    }
+
+    public String serializeRequest(AiTurnRequest request, String defaultModel, boolean stream) {
         try {
             return objectMapper.writeValueAsString(payload(request, defaultModel, stream));
         } catch (JsonProcessingException e) {
@@ -46,27 +48,26 @@ public final class OpenAiChatCodec {
         }
     }
 
-    /**
-     * Parses a non-streaming OpenAI-compatible chat completion response.
-     *
-     * @param body JSON response body
-     * @return SDK chat response
-     */
     public ChatResponse parseResponse(String body) {
+        return ProtocolMapper.toChatResponse(parseTurnResult(body));
+    }
+
+    public AiTurnResult parseTurnResult(String body) {
         try {
             JsonNode root = objectMapper.readTree(body);
             JsonNode choice = root.path("choices").path(0);
             JsonNode message = choice.path("message");
             JsonNode content = message.path("content");
-            List<ChatToolCall> toolCalls = toolCalls(message.path("tool_calls"));
+            List<AiToolCall> toolCalls = toolCalls(message.path("tool_calls"));
             if (!content.isTextual() && toolCalls.isEmpty()) {
                 throw new AiException("Chat response did not contain choices[0].message.content");
             }
-            return new ChatResponse(
+            return new AiTurnResult(
                     content.isTextual() ? content.asText() : "",
                     optionalText(root.path("id")),
                     optionalText(root.path("model")),
                     optionalText(choice.path("finish_reason")),
+                    null,
                     usage(root.path("usage")),
                     toolCalls);
         } catch (JsonProcessingException e) {
@@ -74,15 +75,6 @@ public final class OpenAiChatCodec {
         }
     }
 
-    /**
-     * Parses structured OpenAI-compatible error details, returning {@code null}
-     * when the body is empty, malformed, or does not contain a recognizable
-     * {@code error} object. HTTP error handling still uses the raw body summary
-     * as a fallback so callers get a useful diagnostic either way.
-     *
-     * @param body JSON error response body
-     * @return structured provider error details, or {@code null}
-     */
     public AiError parseError(String body) {
         if (body == null || body.isBlank()) {
             return null;
@@ -105,19 +97,18 @@ public final class OpenAiChatCodec {
         }
     }
 
-    /**
-     * Parses one OpenAI-compatible server-sent event data field into a chat delta.
-     *
-     * @param data raw SSE data value, excluding the {@code data:} prefix
-     * @return SDK chat delta
-     */
     public ChatDelta parseStreamDelta(String data) {
+        return ProtocolMapper.toChatDelta(parseStreamEvent(data));
+    }
+
+    public AiStreamEvent parseStreamEvent(String data) {
         try {
             JsonNode choice = objectMapper.readTree(data).path("choices").path(0);
             JsonNode content = choice.path("delta").path("content");
             JsonNode finishReason = choice.path("finish_reason");
-            return new ChatDelta(
+            return new AiStreamEvent(
                     content.isTextual() ? content.asText() : "",
+                    false,
                     finishReason.isTextual() ? finishReason.asText() : null,
                     toolCalls(choice.path("delta").path("tool_calls")));
         } catch (JsonProcessingException e) {
@@ -125,12 +116,6 @@ public final class OpenAiChatCodec {
         }
     }
 
-    /**
-     * Serializes a fake stream delta using the same event shape consumed by the parser.
-     *
-     * @param delta delta to encode
-     * @return JSON SSE data value
-     */
     public String serializeStreamDelta(ChatDelta delta) {
         try {
             Map<String, Object> choice = new LinkedHashMap<>();
@@ -147,25 +132,22 @@ public final class OpenAiChatCodec {
         }
     }
 
-    private Map<String, Object> payload(ChatRequest request, String defaultModel, boolean stream) {
+    private Map<String, Object> payload(AiTurnRequest request, String defaultModel, boolean stream) {
         String model = request.model() == null ? defaultModel : request.model();
-        List<Map<String, Object>> messages = request.messages().stream()
-                .map(OpenAiChatCodec::messagePayload)
-                .toList();
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("model", model);
-        payload.put("messages", messages);
+        payload.put("messages", request.inputItems().stream()
+                .map(OpenAiChatCodec::messagePayload)
+                .toList());
         putIfPresent(payload, "temperature", request.temperature());
         putIfPresent(payload, "top_p", request.topP());
-        putIfPresent(payload, "max_tokens", request.maxTokens());
+        putIfPresent(payload, "max_tokens", request.maxOutputTokens());
         if (!request.stopSequences().isEmpty()) {
             payload.put("stop", request.stopSequences());
         }
-        putIfPresent(payload, "response_format", responseFormatPayload(request.responseFormat()));
+        putIfPresent(payload, "response_format", responseFormatPayload(request.outputFormat()));
         if (!request.tools().isEmpty()) {
-            payload.put("tools", request.tools().stream()
-                    .map(this::toolPayload)
-                    .toList());
+            payload.put("tools", request.tools().stream().map(this::toolPayload).toList());
         }
         putIfPresent(payload, "tool_choice", toolChoicePayload(request.toolChoice()));
         if (stream) {
@@ -174,7 +156,7 @@ public final class OpenAiChatCodec {
         return payload;
     }
 
-    private Map<String, Object> responseFormatPayload(ChatResponseFormat responseFormat) {
+    private Map<String, Object> responseFormatPayload(AiOutputFormat responseFormat) {
         if (responseFormat == null) {
             return null;
         }
@@ -182,15 +164,17 @@ public final class OpenAiChatCodec {
         payload.put("type", responseFormat.type());
         if ("json_schema".equals(responseFormat.type())) {
             Map<String, Object> jsonSchema = new LinkedHashMap<>();
-            jsonSchema.put("name", responseFormat.jsonSchemaName());
-            jsonSchema.put("schema", parseSchema(responseFormat.jsonSchema()));
+            jsonSchema.put("name", responseFormat.name());
+            jsonSchema.put("schema", parseJsonObject(
+                    responseFormat.schemaJson(),
+                    "Failed to serialize chat response format"));
             jsonSchema.put("strict", responseFormat.strict());
             payload.put("json_schema", jsonSchema);
         }
         return payload;
     }
 
-    private Map<String, Object> toolPayload(ChatTool tool) {
+    private Map<String, Object> toolPayload(AiToolSpec tool) {
         Map<String, Object> function = new LinkedHashMap<>();
         function.put("name", tool.name());
         putIfPresent(function, "description", tool.description());
@@ -198,20 +182,14 @@ public final class OpenAiChatCodec {
         return Map.of("type", "function", "function", function);
     }
 
-    private Object toolChoicePayload(ChatToolChoice toolChoice) {
+    private Object toolChoicePayload(AiToolChoice toolChoice) {
         if (toolChoice == null) {
             return null;
         }
         if ("function".equals(toolChoice.mode())) {
-            return Map.of(
-                    "type", "function",
-                    "function", Map.of("name", toolChoice.functionName()));
+            return Map.of("type", "function", "function", Map.of("name", toolChoice.functionName()));
         }
         return toolChoice.mode();
-    }
-
-    private JsonNode parseSchema(String schemaJson) {
-        return parseJsonObject(schemaJson, "Failed to serialize chat response format");
     }
 
     private JsonNode parseJsonObject(String json, String errorMessage) {
@@ -222,11 +200,16 @@ public final class OpenAiChatCodec {
         }
     }
 
-    private static Map<String, Object> messagePayload(ChatMessage message) {
+    private static Map<String, Object> messagePayload(AiInputItem item) {
         Map<String, Object> payload = new LinkedHashMap<>();
-        payload.put("role", message.role());
-        payload.put("content", message.content());
-        putIfPresent(payload, "tool_call_id", message.toolCallId());
+        if (item.kind() == AiInputItem.Kind.TOOL_RESULT) {
+            payload.put("role", "tool");
+            payload.put("content", item.toolOutput());
+            payload.put("tool_call_id", item.toolCallId());
+            return payload;
+        }
+        payload.put("role", item.role());
+        payload.put("content", item.content().isEmpty() ? "" : item.content().getFirst().text());
         return payload;
     }
 
@@ -244,11 +227,11 @@ public final class OpenAiChatCodec {
         return node.isTextual() || node.isNumber() || node.isBoolean() ? node.asText() : null;
     }
 
-    private static ChatUsage usage(JsonNode node) {
+    private static AiUsage usage(JsonNode node) {
         if (!node.isObject()) {
             return null;
         }
-        return new ChatUsage(
+        return new AiUsage(
                 optionalInt(node.path("prompt_tokens")),
                 optionalInt(node.path("completion_tokens")),
                 optionalInt(node.path("total_tokens")));
@@ -258,39 +241,37 @@ public final class OpenAiChatCodec {
         return node.canConvertToInt() ? node.asInt() : null;
     }
 
-    private static List<ChatToolCall> toolCalls(JsonNode node) {
+    private static List<AiToolCall> toolCalls(JsonNode node) {
         if (!node.isArray()) {
             return List.of();
         }
-        List<ChatToolCall> toolCalls = new java.util.ArrayList<>();
+        List<AiToolCall> calls = new ArrayList<>();
         for (JsonNode item : node) {
             JsonNode function = item.path("function");
             String name = optionalText(function.path("name"));
             if (name == null) {
                 continue;
             }
-            toolCalls.add(new ChatToolCall(
-                    optionalText(item.path("id")),
-                    name,
-                    optionalText(function.path("arguments"))));
+            String id = optionalText(item.path("id"));
+            calls.add(new AiToolCall(id, id, name, optionalText(function.path("arguments"))));
         }
-        return toolCalls;
+        return calls;
     }
 
     private static List<Map<String, Object>> toolCallsPayload(List<ChatToolCall> toolCalls) {
-        return toolCalls.stream()
-                .map(OpenAiChatCodec::toolCallPayload)
-                .toList();
-    }
-
-    private static Map<String, Object> toolCallPayload(ChatToolCall toolCall) {
-        Map<String, Object> function = new LinkedHashMap<>();
-        function.put("name", toolCall.name());
-        function.put("arguments", toolCall.argumentsJson());
-        Map<String, Object> payload = new LinkedHashMap<>();
-        putIfPresent(payload, "id", toolCall.id());
-        payload.put("type", "function");
-        payload.put("function", function);
-        return payload;
+        List<Map<String, Object>> payloads = new ArrayList<>();
+        for (int index = 0; index < toolCalls.size(); index++) {
+            ChatToolCall toolCall = toolCalls.get(index);
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("index", index);
+            putIfPresent(item, "id", toolCall.id());
+            item.put("type", "function");
+            Map<String, Object> function = new LinkedHashMap<>();
+            function.put("name", toolCall.name());
+            function.put("arguments", toolCall.argumentsJson());
+            item.put("function", function);
+            payloads.add(item);
+        }
+        return payloads;
     }
 }

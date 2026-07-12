@@ -47,6 +47,10 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-12: Introduced an internal provider-neutral turn protocol for typed content blocks,
+  function tools/tool calls, usage, and stream events; OpenAI Chat Completions, OpenAI Responses,
+  and Claude Messages adapters now translate through that boundary while preserving existing public
+  chat and response APIs.
 - 2026-07-12: Added a thin HTTP REST boundary to the Spring Boot `support-ticket-triage` example,
   including safe exception mapping and `FakeAiClient` controller tests that verify structured output
   requests without leaking model text or SDK failure details.
