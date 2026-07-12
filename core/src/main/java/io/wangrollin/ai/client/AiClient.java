@@ -12,6 +12,7 @@ import io.wangrollin.ai.internal.http.AiHttpExecutor;
 import io.wangrollin.ai.internal.http.AiHttpRequestSpec;
 import io.wangrollin.ai.internal.http.AiHttpResult;
 import io.wangrollin.ai.internal.provider.AiProviderAdapter;
+import io.wangrollin.ai.internal.provider.AnthropicProviderAdapter;
 import io.wangrollin.ai.internal.provider.OpenAiCompatibleProviderAdapter;
 import io.wangrollin.ai.internal.provider.ProviderRequestSpec;
 import io.wangrollin.ai.response.ResponseRequest;
@@ -44,6 +45,8 @@ public final class AiClient implements AiChatClient, AiResponseClient {
      * Default request and connection timeout.
      */
     public static final Duration DEFAULT_TIMEOUT = Duration.ofSeconds(30);
+
+    private static final String API_KEY_HEADER_PLACEHOLDER = "{apiKey}";
 
     private final String apiKey;
     private final URI baseUri;
@@ -95,12 +98,11 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     public ChatResponse chat(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         ProviderRequestSpec providerRequest = providerAdapter.chatRequest(request, defaultModel, false);
-        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
+        HttpRequest.Builder httpRequestBuilder = providerHttpRequestBuilder(providerRequest)
                 .timeout(timeout)
-                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()));
+        HttpRequest httpRequest = httpRequestBuilder.build();
 
         AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
@@ -169,13 +171,12 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     public ChatStream stream(ChatRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         ProviderRequestSpec providerRequest = providerAdapter.chatRequest(request, defaultModel, true);
-        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
+        HttpRequest.Builder httpRequestBuilder = providerHttpRequestBuilder(providerRequest)
                 .timeout(timeout)
-                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()));
+        HttpRequest httpRequest = httpRequestBuilder.build();
 
         AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
@@ -223,7 +224,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         long streamOpenNanos = System.nanoTime();
         return new ChatStream(
                 response.body(),
-                providerAdapter::parseChatStreamDelta,
+                (event, data) -> providerAdapter.parseChatStreamDelta(event, data),
                 failure -> httpExecutor.emitFailure(
                         providerRequest.operation(),
                         providerRequest.model(),
@@ -239,12 +240,11 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     public ResponseResult respond(ResponseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         ProviderRequestSpec providerRequest = providerAdapter.responseRequest(request, defaultModel, false);
-        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
+        HttpRequest.Builder httpRequestBuilder = providerHttpRequestBuilder(providerRequest)
                 .timeout(timeout)
-                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
-                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()));
+        HttpRequest httpRequest = httpRequestBuilder.build();
 
         AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
@@ -313,13 +313,12 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     public ResponseStream streamResponse(ResponseRequest request) {
         Objects.requireNonNull(request, "request must not be null");
         ProviderRequestSpec providerRequest = providerAdapter.responseRequest(request, defaultModel, true);
-        HttpRequest httpRequest = HttpRequest.newBuilder(providerUri(providerRequest))
+        HttpRequest.Builder httpRequestBuilder = providerHttpRequestBuilder(providerRequest)
                 .timeout(timeout)
-                .header("Authorization", "Bearer " + apiKey)
                 .header("Content-Type", "application/json")
                 .header("Accept", "text/event-stream")
-                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
-                .build();
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()));
+        HttpRequest httpRequest = httpRequestBuilder.build();
 
         AiHttpResult<InputStream> result = httpExecutor.send(new AiHttpRequestSpec(
                 httpRequest,
@@ -383,6 +382,13 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         return baseUri.resolve(providerRequest.relativePath());
     }
 
+    private HttpRequest.Builder providerHttpRequestBuilder(ProviderRequestSpec providerRequest) {
+        HttpRequest.Builder builder = HttpRequest.newBuilder(providerUri(providerRequest));
+        providerRequest.headers().forEach((name, value) ->
+                builder.header(name, value.replace(API_KEY_HEADER_PLACEHOLDER, apiKey)));
+        return builder;
+    }
+
     private String eventModel(String requestModel, String responseModel) {
         return responseModel == null ? requestModel : responseModel;
     }
@@ -408,6 +414,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
             // Keep protocol selection public and adapter classes internal so new
             // providers can be added without freezing the adapter SPI too early.
             case OPENAI_COMPATIBLE -> new OpenAiCompatibleProviderAdapter();
+            case ANTHROPIC -> new AnthropicProviderAdapter();
         };
     }
 
@@ -451,7 +458,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         }
 
         /**
-         * Sets the provider API key used for bearer authentication.
+         * Sets the provider API key used by the selected protocol's authentication headers.
          *
          * @param apiKey API key value; do not commit real keys to source control
          * @return this builder
@@ -462,7 +469,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         }
 
         /**
-         * Sets the OpenAI-compatible base URL.
+         * Sets the provider base URL.
          *
          * @param baseUrl provider base URL, with or without a trailing slash
          * @return this builder

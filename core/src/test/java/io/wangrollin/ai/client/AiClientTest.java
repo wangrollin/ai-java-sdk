@@ -212,6 +212,42 @@ class AiClientTest {
     }
 
     @Test
+    void sendsAnthropicChatRequestWithProviderHeaders() throws Exception {
+        AtomicReference<CapturedRequest> captured = new AtomicReference<>();
+        startServer(exchange -> {
+            captured.set(capture(exchange));
+            respond(exchange, 200, """
+                    {
+                      "id": "msg_123",
+                      "model": "claude-test",
+                      "stop_reason": "end_turn",
+                      "usage": {"input_tokens": 3, "output_tokens": 4},
+                      "content": [{"type": "text", "text": "ok"}]
+                    }
+                    """);
+        });
+
+        ChatResponse response = anthropicTestClient().chat(ChatRequest.builder()
+                .message(ChatMessage.system("Be brief."))
+                .message(ChatMessage.user("Hello"))
+                .build());
+
+        assertEquals("ok", response.text());
+        assertEquals("msg_123", response.id());
+        assertEquals(new ChatUsage(3, 4, 7), response.usage());
+        assertEquals("/messages", captured.get().path());
+        assertNull(captured.get().authorization());
+        assertEquals("test-key", captured.get().apiKey());
+        assertEquals("2023-06-01", captured.get().anthropicVersion());
+
+        JsonNode requestJson = OBJECT_MAPPER.readTree(captured.get().body());
+        assertEquals("claude-test", requestJson.path("model").asText());
+        assertEquals("Be brief.", requestJson.path("system").asText());
+        assertEquals(1024, requestJson.path("max_tokens").asInt());
+        assertEquals("Hello", requestJson.path("messages").path(0).path("content").path(0).path("text").asText());
+    }
+
+    @Test
     void explicitBaseUrlOverridesProviderPreset() throws Exception {
         AtomicReference<CapturedRequest> captured = new AtomicReference<>();
         startServer(exchange -> {
@@ -722,6 +758,55 @@ class AiClientTest {
     }
 
     @Test
+    void streamsAnthropicNamedEvents() throws Exception {
+        startServer(exchange -> respondStream(exchange, """
+                event: message_start
+                data: {"type":"message_start","message":{"id":"msg_123"}}
+
+                event: content_block_delta
+                data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"Hel"}}
+
+                event: content_block_delta
+                data: {"type":"content_block_delta","delta":{"type":"text_delta","text":"lo"}}
+
+                event: message_delta
+                data: {"type":"message_delta","delta":{"stop_reason":"end_turn"}}
+
+                """));
+
+        List<ChatDelta> deltas = new ArrayList<>();
+        try (ChatStream stream = anthropicTestClient().stream(ChatRequest.builder()
+                .message(ChatMessage.user("Hello"))
+                .build())) {
+            for (ChatDelta delta : stream) {
+                deltas.add(delta);
+            }
+        }
+
+        assertEquals(List.of(
+                new ChatDelta("Hel", null),
+                new ChatDelta("lo", null),
+                new ChatDelta("", "end_turn")), deltas);
+    }
+
+    @Test
+    void rejectsAnthropicResponsesApiCallsBeforeHttpSend() throws Exception {
+        AtomicInteger attempts = new AtomicInteger();
+        startServer(exchange -> {
+            attempts.incrementAndGet();
+            respond(exchange, 200, "{}");
+        });
+
+        AiException exception = assertThrows(AiException.class, () -> anthropicTestClient().respond(
+                io.wangrollin.ai.response.ResponseRequest.builder()
+                        .input("Hello")
+                        .build()));
+
+        assertTrue(exception.getMessage().contains("does not support the OpenAI Responses API"));
+        assertEquals(0, attempts.get());
+    }
+
+    @Test
     void streamingDiagnosticsOnlyRecordsRequestForSuccessfulStream() throws Exception {
         RecordingPayloadDiagnosticsListener diagnostics = new RecordingPayloadDiagnosticsListener();
         startServer(exchange -> respondStream(exchange, """
@@ -902,6 +987,16 @@ class AiClientTest {
         return builder.build();
     }
 
+    private AiClient anthropicTestClient() {
+        return AiClient.builder()
+                .apiKey("test-key")
+                .provider(AiProvider.ANTHROPIC)
+                .baseUrl("http://localhost:" + server.getAddress().getPort())
+                .defaultModel("claude-test")
+                .timeout(Duration.ofSeconds(5))
+                .build();
+    }
+
     private AiClient retryingTestClient(int maxAttempts) {
         return retryingTestClient(maxAttempts, null);
     }
@@ -935,6 +1030,15 @@ class AiClientTest {
                 throw new RuntimeException(e);
             }
         });
+        server.createContext("/messages", exchange -> {
+            try {
+                handler.handle(exchange);
+            } catch (RuntimeException e) {
+                throw e;
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        });
         server.start();
     }
 
@@ -945,6 +1049,8 @@ class AiClientTest {
                     exchange.getRequestURI().getPath(),
                     exchange.getRequestMethod(),
                     exchange.getRequestHeaders().getFirst("Authorization"),
+                    exchange.getRequestHeaders().getFirst("x-api-key"),
+                    exchange.getRequestHeaders().getFirst("anthropic-version"),
                     exchange.getRequestHeaders().getFirst("Content-Type"),
                     body);
         } catch (IOException e) {
@@ -980,6 +1086,8 @@ class AiClientTest {
             String path,
             String method,
             String authorization,
+            String apiKey,
+            String anthropicVersion,
             String contentType,
             String body) {
     }

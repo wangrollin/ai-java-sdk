@@ -19,7 +19,7 @@ import java.util.Set;
 @ConfigurationProperties("ai.sdk")
 public class AiSdkProperties {
     /**
-     * Provider API key used for bearer authentication.
+     * Provider API key passed through the selected protocol's authentication headers.
      */
     private String apiKey;
 
@@ -29,7 +29,7 @@ public class AiSdkProperties {
     private String model;
 
     /**
-     * OpenAI-compatible provider base URL. When unset, the selected provider preset supplies the default.
+     * Provider base URL. When unset, the selected provider preset supplies the default.
      */
     private String baseUrl;
 

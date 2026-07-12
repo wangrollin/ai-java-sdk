@@ -10,6 +10,8 @@ import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 
+import java.util.Map;
+
 /**
  * Default adapter for OpenAI-compatible chat completions and Responses API endpoints.
  */
@@ -20,6 +22,7 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
     private static final String RESPONSE_STREAM_OPERATION = "response.stream";
     private static final String CHAT_PATH = "/" + OpenAiChatCodec.CHAT_COMPLETIONS_PATH;
     private static final String RESPONSES_PATH = "/" + OpenAiResponseCodec.RESPONSES_PATH;
+    private static final Map<String, String> AUTH_HEADERS = Map.of("Authorization", "Bearer {apiKey}");
 
     private final OpenAiChatCodec chatCodec = new OpenAiChatCodec();
     private final OpenAiResponseCodec responseCodec = new OpenAiResponseCodec();
@@ -32,6 +35,7 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
                 CHAT_PATH,
                 model,
                 stream,
+                AUTH_HEADERS,
                 chatCodec.serializeRequest(request, defaultModel, stream));
     }
 
@@ -53,6 +57,7 @@ public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter 
                 RESPONSES_PATH,
                 model,
                 stream,
+                AUTH_HEADERS,
                 responseCodec.serializeRequest(request, defaultModel, stream));
     }
 

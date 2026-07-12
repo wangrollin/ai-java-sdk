@@ -14,5 +14,7 @@ class AiProviderPresetTest {
         assertEquals("https://api.moonshot.cn/v1", AiProviderPreset.MOONSHOT.baseUrl());
         assertEquals("https://open.bigmodel.cn/api/paas/v4", AiProviderPreset.ZHIPU.baseUrl());
         assertEquals("https://openrouter.ai/api/v1", AiProviderPreset.OPENROUTER.baseUrl());
+        assertEquals(AiProvider.ANTHROPIC, AiProviderPreset.ANTHROPIC.provider());
+        assertEquals("https://api.anthropic.com/v1", AiProviderPreset.ANTHROPIC.baseUrl());
     }
 }

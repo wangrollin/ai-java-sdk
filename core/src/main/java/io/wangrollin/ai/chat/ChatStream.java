@@ -10,6 +10,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Iterator;
 import java.util.NoSuchElementException;
 import java.util.Objects;
+import java.util.function.BiFunction;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -21,7 +22,7 @@ import java.util.function.Function;
  */
 public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     private final BufferedReader reader;
-    private final Function<String, ChatDelta> deltaParser;
+    private final BiFunction<String, String, ChatDelta> deltaParser;
     private final Consumer<AiException> failureListener;
     private boolean closed;
 
@@ -32,7 +33,7 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
      * @param deltaParser parser for each non-empty {@code data:} value
      */
     public ChatStream(InputStream inputStream, Function<String, ChatDelta> deltaParser) {
-        this(inputStream, deltaParser, failure -> {
+        this(inputStream, (event, data) -> deltaParser.apply(data), failure -> {
         });
     }
 
@@ -47,6 +48,22 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
     public ChatStream(
             InputStream inputStream,
             Function<String, ChatDelta> deltaParser,
+            Consumer<AiException> failureListener) {
+        this(inputStream, (event, data) -> deltaParser.apply(data), failureListener);
+    }
+
+    /**
+     * Creates a stream with a parser that can inspect both the SSE event name
+     * and data payload. OpenAI-compatible streams usually omit event names,
+     * while Anthropic streams use them to identify text, stop, and ping events.
+     *
+     * @param inputStream raw server-sent event response body
+     * @param deltaParser parser for each completed SSE event
+     * @param failureListener callback for stream read or parse failures
+     */
+    public ChatStream(
+            InputStream inputStream,
+            BiFunction<String, String, ChatDelta> deltaParser,
             Consumer<AiException> failureListener) {
         this.reader = new BufferedReader(new InputStreamReader(
                 Objects.requireNonNull(inputStream, "inputStream must not be null"),
@@ -115,23 +132,40 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
             return null;
         }
         try {
+            String event = null;
+            StringBuilder data = new StringBuilder();
             String line;
             while ((line = reader.readLine()) != null) {
+                if (line.isEmpty()) {
+                    ChatDelta delta = parseBufferedDelta(event, data);
+                    if (closed) {
+                        return null;
+                    }
+                    event = null;
+                    data.setLength(0);
+                    if (delta != null) {
+                        return delta;
+                    }
+                    continue;
+                }
+                if (line.startsWith("event:")) {
+                    event = line.substring("event:".length()).trim();
+                    continue;
+                }
                 if (!line.startsWith("data:")) {
                     continue;
                 }
-                String data = line.substring("data:".length()).trim();
-                if (data.isEmpty()) {
-                    continue;
+                if (!data.isEmpty()) {
+                    data.append('\n');
                 }
-                if ("[DONE]".equals(data)) {
-                    close();
-                    return null;
-                }
-                ChatDelta delta = parseDelta(data);
-                if (!delta.text().isEmpty() || delta.finishReason() != null || !delta.toolCalls().isEmpty()) {
-                    return delta;
-                }
+                data.append(line.substring("data:".length()).trim());
+            }
+            ChatDelta delta = parseBufferedDelta(event, data);
+            if (closed) {
+                return null;
+            }
+            if (delta != null) {
+                return delta;
             }
             close();
             return null;
@@ -143,9 +177,25 @@ public final class ChatStream implements AutoCloseable, Iterable<ChatDelta> {
         }
     }
 
-    private ChatDelta parseDelta(String data) {
+    private ChatDelta parseBufferedDelta(String event, StringBuilder data) {
+        if (data.isEmpty()) {
+            return null;
+        }
+        String payload = data.toString();
+        if ("[DONE]".equals(payload)) {
+            close();
+            return null;
+        }
+        ChatDelta delta = parseDelta(event, payload);
+        if (!delta.text().isEmpty() || delta.finishReason() != null || !delta.toolCalls().isEmpty()) {
+            return delta;
+        }
+        return null;
+    }
+
+    private ChatDelta parseDelta(String event, String data) {
         try {
-            return deltaParser.apply(data);
+            return deltaParser.apply(event, data);
         } catch (AiException e) {
             closeAfterFailure(e);
             failureListener.accept(e);

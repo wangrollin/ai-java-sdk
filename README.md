@@ -54,11 +54,12 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Tool-calling request and response plumbing for Responses API calls.
 - [x] Structured JSON output hints for chat completions and Responses API calls.
 - [x] Responses API image input references, function-tool plumbing, and background mode requests.
+- [x] Anthropic Claude Messages API adapter for chat, streaming text, and basic tool calling.
 - [x] Request/response diagnostics with conservative redaction.
 - [x] Safe lifecycle events, dependency-free metrics hooks, optional Micrometer metrics, and optional OpenTelemetry tracing.
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
 - [x] Internal provider adapter boundary with OpenAI-compatible support as the default implementation.
-- [x] Provider presets for common OpenAI-compatible model services.
+- [x] Provider presets for common OpenAI-compatible model services and Anthropic.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
 ## Spring Boot Workflow Example
@@ -89,13 +90,13 @@ more provider fields:
 
 The v0.1.0 foundation has been released. It already contains the production integration pieces that
 make the project more than a model API wrapper: OpenAI-compatible chat completions and Responses API
-clients, streaming, tool-calling plumbing, structured output hints, safe lifecycle events, optional
-Micrometer metrics, optional OpenTelemetry tracing, redacted payload diagnostics, Spring Boot
-auto-configuration, provider presets, and in-memory testing support.
+clients, Anthropic Claude Messages chat support, streaming, tool-calling plumbing, structured output
+hints, safe lifecycle events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted
+payload diagnostics, Spring Boot auto-configuration, provider presets, and in-memory testing support.
 
-The SDK does not yet include additional provider adapters beyond the OpenAI-compatible protocol.
-Provider presets cover common OpenAI-compatible model services without exposing provider-specific
-wire details too early.
+OpenAI-compatible APIs remain the default provider path. Anthropic support is implemented as a focused
+internal adapter for Claude Messages API chat calls; it intentionally does not pretend that Claude
+Messages is the same protocol as OpenAI Responses API.
 
 ## Requirements
 
@@ -544,9 +545,9 @@ Advanced provider features such as stored conversation management are left for l
 
 ## Provider Compatibility
 
-`AiProviderPreset` provides documented base URLs for common model services that expose an
-OpenAI-compatible API. Presets set protocol and endpoint defaults only; applications still provide
-API keys and model names through environment-backed configuration.
+`AiProviderPreset` provides documented base URLs for common model services. Presets set protocol and
+endpoint defaults only; applications still provide API keys and model names through environment-backed
+configuration.
 
 ```java
 AiChatClient client = AiClient.builder()
@@ -564,10 +565,22 @@ AiChatClient client = AiClient.builder()
 | `MOONSHOT` | `https://api.moonshot.cn/v1` | OpenAI-compatible Chat Completions |
 | `ZHIPU` | `https://open.bigmodel.cn/api/paas/v4` | OpenAI-compatible Chat Completions |
 | `OPENROUTER` | `https://openrouter.ai/api/v1` | OpenAI-compatible Chat Completions |
+| `ANTHROPIC` | `https://api.anthropic.com/v1` | Claude Messages API chat and streaming text |
 
-For non-OpenAI services, the first compatibility target is chat, streaming chat, tool calling, and
-JSON output hints through the OpenAI-compatible chat completions protocol. The SDK's Responses API
+For OpenAI-compatible non-OpenAI services, the first compatibility target is chat, streaming chat,
+tool calling, and JSON output hints through the chat completions protocol. The SDK's Responses API
 client remains available, but providers that do not implement `/responses` may reject those calls.
+For Anthropic, use `chat(...)` or `stream(...)`; `respond(...)` and `streamResponse(...)` fail fast
+because Claude Messages is not the OpenAI Responses API.
+
+```java
+AiChatClient claude = AiClient.builder()
+    .apiKey(System.getenv("ANTHROPIC_API_KEY"))
+    .providerPreset(AiProviderPreset.ANTHROPIC)
+    .defaultModel("claude-sonnet-4-20250514")
+    .build();
+```
+
 Use `baseUrl(...)` or `ai.sdk.base-url` when a provider account, region, proxy, or gateway requires
 a custom endpoint; explicit base URLs override preset defaults.
 
@@ -624,7 +637,8 @@ or `java.net.http.HttpClient` beans, the starter passes them into the SDK builde
 disabled unless `ai.sdk.retry.enabled=true` is set, matching the core SDK default behavior.
 `ai.sdk.provider` defaults to `openai-compatible`, so applications can omit it until they need to
 make provider protocol selection explicit across environments. `ai.sdk.provider-preset` defaults to
-`openai`; when `ai.sdk.base-url` is also configured, the explicit base URL wins over the preset.
+`openai`; use `ai.sdk.provider=anthropic` and `ai.sdk.provider-preset=anthropic` for Claude. When
+`ai.sdk.base-url` is also configured, the explicit base URL wins over the preset.
 
 ## Testing Support
 

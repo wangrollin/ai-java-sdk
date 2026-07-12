@@ -13,5 +13,10 @@ public enum AiProvider {
     /**
      * OpenAI-compatible chat completions and Responses API protocol.
      */
-    OPENAI_COMPATIBLE
+    OPENAI_COMPATIBLE,
+
+    /**
+     * Anthropic Claude Messages API protocol.
+     */
+    ANTHROPIC
 }

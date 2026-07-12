@@ -32,6 +32,22 @@ Implications:
 - Provider-specific capabilities should not reshape common public APIs unless the behavior is broadly useful and stable.
 - Adapter tests should protect the provider boundary from accidental wire-format leakage.
 
+## 2026-07-12 - Add Claude Through the Internal Adapter Boundary
+
+Decision: Anthropic Claude support is implemented as a native Messages API adapter behind the existing internal provider boundary.
+
+Context:
+
+- Claude Messages differs from OpenAI Chat Completions and Responses in authentication headers, system-message placement, content blocks, tool-use blocks, and named streaming events.
+- The public chat API can represent Claude's basic text, streaming text, and function-tool workflow without adding a second public client shape.
+- Claude Messages is not an OpenAI Responses API equivalent, so mapping Responses calls to Claude would create misleading compatibility claims.
+
+Implications:
+
+- `AiChatClient` remains the common surface for OpenAI-compatible chat and Claude Messages.
+- `AiResponseClient` stays OpenAI-compatible only unless a provider exposes the Responses API protocol.
+- Provider adapters own protocol-specific headers, endpoint paths, JSON payloads, and stream event parsing.
+
 ## 2026-07-11 - Observability Must Be Conservative by Default
 
 Decision: Default lifecycle events, metrics, tracing, and diagnostics must not expose API keys, prompts, model outputs, tool arguments, or raw provider response bodies.

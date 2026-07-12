@@ -36,7 +36,12 @@ public enum AiProviderPreset {
     /**
      * OpenRouter's OpenAI-compatible model routing endpoint.
      */
-    OPENROUTER(AiProvider.OPENAI_COMPATIBLE, "https://openrouter.ai/api/v1");
+    OPENROUTER(AiProvider.OPENAI_COMPATIBLE, "https://openrouter.ai/api/v1"),
+
+    /**
+     * Anthropic's native Claude Messages API endpoint.
+     */
+    ANTHROPIC(AiProvider.ANTHROPIC, "https://api.anthropic.com/v1");
 
     private final AiProvider provider;
     private final String baseUrl;

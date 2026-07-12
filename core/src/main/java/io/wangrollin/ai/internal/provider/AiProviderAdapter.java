@@ -43,6 +43,21 @@ public interface AiProviderAdapter {
     ChatDelta parseChatStreamDelta(String data);
 
     /**
+     * Parses one provider streaming chat event with access to the SSE event name.
+     *
+     * <p>OpenAI-compatible streams usually rely only on {@code data}. Providers
+     * such as Anthropic use named events, so adapters can override this method
+     * while older codecs continue to implement the data-only parser.
+     *
+     * @param event optional SSE event name
+     * @param data raw server-sent event data value
+     * @return SDK chat delta
+     */
+    default ChatDelta parseChatStreamDelta(String event, String data) {
+        return parseChatStreamDelta(data);
+    }
+
+    /**
      * Creates a provider-specific Responses API request specification.
      *
      * @param request public Responses API request
