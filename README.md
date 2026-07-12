@@ -69,6 +69,24 @@ Boot REST workflow that accepts support tickets over HTTP, uses the starter conf
 structured JSON output for support-ticket routing, wires metadata-only lifecycle logging, and tests
 the service and controller with `FakeAiClient` instead of API keys or sockets.
 
+## Backend Adoption Quick Path
+
+For a Spring Boot backend team, the shortest path is:
+
+1. Add `ai-java-sdk-spring-boot-starter` and configure `ai.sdk.*` from environment-backed
+   application properties.
+2. Depend on the narrow interface the service needs, usually `AiChatClient` for chat-style
+   workflows or `AiResponseClient` for OpenAI-compatible Responses API calls.
+3. Model the AI boundary as ordinary backend code: assemble prompts, request structured JSON when
+   the service needs typed routing decisions, and keep lifecycle logging metadata-only by default.
+4. Test the service and HTTP boundary with `FakeAiClient`, asserting prompt assembly, structured
+   output requests, SDK failures, and controller error mapping without API keys or sockets.
+
+The `examples/support-ticket-triage` module follows this path end to end: a Spring Boot controller
+exposes `POST /support-tickets/triage`, the service asks for structured category/priority/queue
+output, safe telemetry stays outside the model payload, and tests cover both service behavior and
+the REST boundary using the in-memory fake.
+
 ## Roadmap
 
 Future work should prove that the SDK helps real Java backend teams adopt AI safely, not just expose

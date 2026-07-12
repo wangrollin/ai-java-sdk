@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-12: Added a README backend adoption quick path that connects the first-screen value
+  proposition to the Spring Boot starter, the `support-ticket-triage` REST workflow, metadata-only
+  telemetry, and `FakeAiClient` tests for service and HTTP boundaries.
 - 2026-07-12: Introduced an internal provider-neutral turn protocol for typed content blocks,
   function tools/tool calls, usage, and stream events; OpenAI Chat Completions, OpenAI Responses,
   and Claude Messages adapters now translate through that boundary while preserving existing public
@@ -80,12 +83,12 @@ Completion criteria:
 
 ## Next Candidates
 
-1. Add a README quick path that connects the first-screen value proposition to the Spring Boot
-   workflow demo, REST boundary, and fake-client testing story.
-2. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
+1. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
    API behavior.
-3. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
+2. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
    or should be lowered in a future release.
+3. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
+   assertions, failures, and streaming errors.
 
 ## Long-Term Goal Review
 
