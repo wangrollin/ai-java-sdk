@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-12: Added a thin HTTP REST boundary to the Spring Boot `support-ticket-triage` example,
+  including safe exception mapping and `FakeAiClient` controller tests that verify structured output
+  requests without leaking model text or SDK failure details.
 - 2026-07-11: Added a compiled Spring Boot `support-ticket-triage` workflow example that combines
   structured JSON output, externalized starter configuration, metadata-only lifecycle logging, and
   `FakeAiClient` tests for prompt assembly, schema requests, parsing failures, and SDK failures.
@@ -68,17 +71,17 @@ Completion criteria:
 - Provider presets can look like support promises unless backed by compatibility evidence.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
-- The first Spring Boot workflow example proves service-level integration, but it does not yet show
-  an HTTP controller or queue consumer boundary that many backend teams will expect.
+- The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
+  show asynchronous queue consumption, which some backend teams may expect for support workflows.
 
 ## Next Candidates
 
-1. Add a thin HTTP or queue boundary to the `support-ticket-triage` example so teams can see how the
-   SDK fits into an end-to-end backend request path without expanding SDK APIs.
-2. Add a README quick path that connects the first-screen value proposition to the Spring Boot
-   workflow demo and fake-client testing story once those artifacts exist.
-3. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
+1. Add a README quick path that connects the first-screen value proposition to the Spring Boot
+   workflow demo, REST boundary, and fake-client testing story.
+2. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
    API behavior.
+3. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
+   or should be lowered in a future release.
 
 ## Long-Term Goal Review
 

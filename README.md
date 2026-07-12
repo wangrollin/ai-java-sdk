@@ -64,9 +64,9 @@ The SDK now includes the first production-oriented layers around that foundation
 ## Spring Boot Workflow Example
 
 For a backend-oriented adoption path, see `examples/support-ticket-triage`. It is a small Spring
-Boot service example that uses the starter configuration, requests structured JSON output for
-support-ticket routing, wires metadata-only lifecycle logging, and tests the workflow with
-`FakeAiClient` instead of API keys or sockets.
+Boot REST workflow that accepts support tickets over HTTP, uses the starter configuration, requests
+structured JSON output for support-ticket routing, wires metadata-only lifecycle logging, and tests
+the service and controller with `FakeAiClient` instead of API keys or sockets.
 
 ## Roadmap
 
@@ -682,10 +682,10 @@ Small, compilable examples live in `core/src/examples/java/io/wangrollin/ai/exam
 - `PayloadDiagnosticsExample` enables opt-in redacted payload diagnostics.
 - `FakeAiClientExample` demonstrates in-memory test usage without API keys or sockets.
 
-The next adoption-focused example should be a small Spring Boot `support-ticket-triage` service that
-returns structured JSON such as category, urgency, summary, and suggested reply while demonstrating
-configuration-only provider switching, safe metrics/tracing, redacted diagnostics, and fake-client
-tests.
+The adoption-focused Spring Boot example in `examples/support-ticket-triage` exposes
+`POST /support-tickets/triage`, returns structured JSON such as category, priority, summary, and
+queue, and demonstrates configuration-only provider switching, safe lifecycle logging, and
+fake-client tests for both the service contract and HTTP boundary.
 
 The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
 keys, prompts containing private data, provider response bodies, or other sensitive values in the
