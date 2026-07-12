@@ -62,9 +62,20 @@ class AiClientTest {
     }
 
     @Test
-    void usesDefaultBaseUrlAndTimeout() {
+    void requiresBaseUrl() {
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, () -> AiClient.builder()
+                .apiKey("test-key")
+                .defaultModel("test-model")
+                .build());
+
+        assertEquals("baseUrl must not be null", exception.getMessage());
+    }
+
+    @Test
+    void usesExplicitBaseUrlAndDefaultTimeout() {
         AiClient client = AiClient.builder()
                 .apiKey("test-key")
+                .baseUrl("http://localhost")
                 .defaultModel("test-model")
                 .build();
 

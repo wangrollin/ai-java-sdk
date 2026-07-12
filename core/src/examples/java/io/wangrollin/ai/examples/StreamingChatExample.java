@@ -17,6 +17,7 @@ public final class StreamingChatExample {
     public static void main(String[] args) {
         AiChatClient client = AiClient.builder()
                 .apiKey(System.getenv("OPENAI_API_KEY"))
+                .baseUrl(System.getenv("OPENAI_BASE_URL"))
                 .defaultModel("gpt-4.1-mini")
                 .build();
 

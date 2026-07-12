@@ -58,7 +58,7 @@ public final class AiClient implements AiChatClient, AiResponseClient {
     private AiClient(Builder builder) {
         this.apiKey = requireText(builder.apiKey, "apiKey");
         AiProviderPreset providerPreset = builder.providerPreset == null ? AiProviderPreset.OPENAI : builder.providerPreset;
-        this.baseUri = normalizeBaseUri(builder.baseUrl == null ? providerPreset.baseUrl() : builder.baseUrl);
+        this.baseUri = normalizeBaseUri(builder.baseUrl);
         this.defaultModel = requireText(builder.defaultModel, "defaultModel");
         this.timeout = builder.timeout == null ? DEFAULT_TIMEOUT : builder.timeout;
         if (this.timeout.isZero() || this.timeout.isNegative()) {
@@ -508,10 +508,14 @@ public final class AiClient implements AiChatClient, AiResponseClient {
         /**
          * Applies a known provider preset for OpenAI-compatible model services.
          *
-         * <p>Presets fill in the protocol and base URL defaults only. They do
-         * not include API keys, default models, or provider-specific feature
-         * guarantees. A later or earlier explicit {@link #provider(AiProvider)}
-         * or {@link #baseUrl(String)} call wins for the field it configures.
+         * <p>Presets fill in the provider protocol only. They expose documented
+         * provider endpoints via {@link AiProviderPreset#baseUrl()} for callers
+         * that want to copy the value into external configuration, but the
+         * runtime client still requires an explicit {@link #baseUrl(String)} so
+         * applications do not accidentally bind to a provider endpoint.
+         * Presets do not include API keys, default models, or provider-specific
+         * feature guarantees. A later or earlier explicit
+         * {@link #provider(AiProvider)} call wins for the protocol field.
          *
          * @param providerPreset provider preset to apply
          * @return this builder

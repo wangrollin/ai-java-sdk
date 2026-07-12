@@ -18,6 +18,7 @@ public final class MetricsListenerExample {
         InMemoryAiMetricsListener metrics = InMemoryAiMetricsListener.create();
         AiChatClient client = AiClient.builder()
                 .apiKey(System.getenv("OPENAI_API_KEY"))
+                .baseUrl(System.getenv("OPENAI_BASE_URL"))
                 .defaultModel("gpt-4.1-mini")
                 .eventListener(metrics)
                 .build();

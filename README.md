@@ -152,7 +152,7 @@ import java.time.Duration;
 AiChatClient client = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .provider(AiProvider.OPENAI_COMPATIBLE)
-    .baseUrl("https://api.openai.com/v1")
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .timeout(Duration.ofSeconds(30))
     .retryPolicy(RetryPolicy.defaultPolicy())
@@ -272,6 +272,7 @@ AiEventListener listener = new AiEventListener() {
 
 AiChatClient observedClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(listener)
     .build();
@@ -283,6 +284,7 @@ For a ready-to-use logging integration, attach `LoggingAiEventListener`. It uses
 ```java
 AiChatClient loggedClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(LoggingAiEventListener.builder()
         .logStartedEvents(false)
@@ -299,6 +301,7 @@ InMemoryAiMetricsListener metrics = InMemoryAiMetricsListener.create();
 
 AiChatClient measuredClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(metrics)
     .build();
@@ -336,6 +339,7 @@ MeterRegistry registry = // obtain from your application runtime
 
 AiChatClient micrometerClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(MicrometerAiEventListener.create(registry))
     .build();
@@ -361,6 +365,7 @@ OpenTelemetry openTelemetry = // obtain from your application runtime
 
 AiChatClient tracedClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .eventListener(OpenTelemetryAiEventListener.create(openTelemetry))
     .build();
@@ -374,6 +379,7 @@ is logged.
 ```java
 AiChatClient diagnosticClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .payloadDiagnosticsListener(LoggingAiPayloadDiagnosticsListener.create())
     .build();
@@ -417,6 +423,7 @@ Retries are disabled by default. Use `RetryPolicy.defaultPolicy()` to retry tran
 ```java
 AiClient client = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .retryPolicy(RetryPolicy.builder()
         .maxAttempts(3)
@@ -437,6 +444,7 @@ chat completions.
 ```java
 AiResponseClient responseClient = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
+    .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
     .build();
 
@@ -545,13 +553,14 @@ Advanced provider features such as stored conversation management are left for l
 
 ## Provider Compatibility
 
-`AiProviderPreset` provides documented base URLs for common model services. Presets set protocol and
-endpoint defaults only; applications still provide API keys and model names through environment-backed
-configuration.
+`AiProviderPreset` provides protocol selection and documented base URL references for common model
+services. Applications still provide API keys, endpoint URLs, and model names through
+environment-backed configuration so proxies, gateways, and regional endpoints are explicit.
 
 ```java
 AiChatClient client = AiClient.builder()
     .apiKey(System.getenv("DEEPSEEK_API_KEY"))
+    .baseUrl(System.getenv("DEEPSEEK_BASE_URL"))
     .providerPreset(AiProviderPreset.DEEPSEEK)
     .defaultModel("deepseek-chat")
     .build();
@@ -576,13 +585,14 @@ because Claude Messages is not the OpenAI Responses API.
 ```java
 AiChatClient claude = AiClient.builder()
     .apiKey(System.getenv("ANTHROPIC_API_KEY"))
+    .baseUrl(System.getenv("ANTHROPIC_BASE_URL"))
     .providerPreset(AiProviderPreset.ANTHROPIC)
     .defaultModel("claude-sonnet-4-20250514")
     .build();
 ```
 
-Use `baseUrl(...)` or `ai.sdk.base-url` when a provider account, region, proxy, or gateway requires
-a custom endpoint; explicit base URLs override preset defaults.
+Use `baseUrl(...)` or `ai.sdk.base-url` for every runtime client. Preset base URLs are reference
+values that can be copied into environment-specific configuration, not implicit runtime defaults.
 
 ## Spring Boot Starter
 
@@ -605,7 +615,7 @@ ai.sdk.api-key=${OPENAI_API_KEY}
 ai.sdk.model=gpt-4.1-mini
 ai.sdk.provider=openai-compatible
 ai.sdk.provider-preset=openai
-ai.sdk.base-url=https://api.openai.com/v1
+ai.sdk.base-url=${OPENAI_BASE_URL}
 ai.sdk.timeout=30s
 ai.sdk.retry.enabled=true
 ai.sdk.retry.max-attempts=3
@@ -637,8 +647,8 @@ or `java.net.http.HttpClient` beans, the starter passes them into the SDK builde
 disabled unless `ai.sdk.retry.enabled=true` is set, matching the core SDK default behavior.
 `ai.sdk.provider` defaults to `openai-compatible`, so applications can omit it until they need to
 make provider protocol selection explicit across environments. `ai.sdk.provider-preset` defaults to
-`openai`; use `ai.sdk.provider=anthropic` and `ai.sdk.provider-preset=anthropic` for Claude. When
-`ai.sdk.base-url` is also configured, the explicit base URL wins over the preset.
+`openai`; use `ai.sdk.provider=anthropic` and `ai.sdk.provider-preset=anthropic` for Claude. Always
+set `ai.sdk.base-url`; presets expose reference endpoints but do not bind the runtime client to one.
 
 ## Testing Support
 
@@ -701,9 +711,9 @@ The adoption-focused Spring Boot example in `examples/support-ticket-triage` exp
 queue, and demonstrates configuration-only provider switching, safe lifecycle logging, and
 fake-client tests for both the service contract and HTTP boundary.
 
-The networked examples read `OPENAI_API_KEY` from the environment at runtime. Do not hard-code API
-keys, prompts containing private data, provider response bodies, or other sensitive values in the
-repository.
+The networked examples read `OPENAI_API_KEY` and `OPENAI_BASE_URL` from the environment at runtime.
+Do not hard-code API keys, prompts containing private data, provider response bodies, or other
+sensitive values in the repository.
 
 ## Release Readiness
 

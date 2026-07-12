@@ -19,6 +19,8 @@ public final class BasicChatExample {
         AiChatClient client = AiClient.builder()
                 // Read credentials at runtime so examples never encourage committing secrets.
                 .apiKey(System.getenv("OPENAI_API_KEY"))
+                // Keep provider endpoints in runtime configuration for proxies, gateways, and regions.
+                .baseUrl(System.getenv("OPENAI_BASE_URL"))
                 .defaultModel("gpt-4.1-mini")
                 .timeout(Duration.ofSeconds(30))
                 .build();

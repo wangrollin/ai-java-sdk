@@ -12,7 +12,7 @@ import java.util.Set;
  * Configuration properties for the default {@link AiClient} managed by Spring Boot.
  *
  * <p>The starter keeps provider credentials in external application configuration
- * instead of embedding them in code. The API key and model are intentionally
+ * instead of embedding them in code. The API key, base URL, and model are intentionally
  * validated when the client bean is created so applications fail fast during
  * startup if required runtime configuration is missing.
  */
@@ -29,7 +29,7 @@ public class AiSdkProperties {
     private String model;
 
     /**
-     * Provider base URL. When unset, the selected provider preset supplies the default.
+     * Provider base URL supplied by application configuration.
      */
     private String baseUrl;
 
@@ -39,7 +39,7 @@ public class AiSdkProperties {
     private AiProvider provider = AiProvider.OPENAI_COMPATIBLE;
 
     /**
-     * Provider preset used to fill in protocol and base URL defaults.
+     * Provider preset used to select protocol defaults and expose endpoint references.
      */
     private AiProviderPreset providerPreset = AiProviderPreset.OPENAI;
 
@@ -115,6 +115,10 @@ public class AiSdkProperties {
 
     String requireModel() {
         return requireText(model, "ai.sdk.model");
+    }
+
+    String requireBaseUrl() {
+        return requireText(baseUrl, "ai.sdk.base-url");
     }
 
     Duration requireTimeout() {

@@ -39,14 +39,12 @@ public class AiSdkAutoConfiguration {
             ObjectProvider<HttpClient> httpClient) {
         AiClient.Builder builder = AiClient.builder()
                 .apiKey(properties.requireApiKey())
+                .baseUrl(properties.requireBaseUrl())
                 .defaultModel(properties.requireModel())
                 .providerPreset(properties.requireProviderPreset())
                 .provider(properties.requireProvider())
                 .timeout(properties.requireTimeout())
                 .retryPolicy(retryPolicy(properties.getRetry()));
-        if (properties.getBaseUrl() != null) {
-            builder.baseUrl(properties.getBaseUrl());
-        }
 
         eventListener.ifAvailable(builder::eventListener);
         payloadDiagnosticsListener.ifAvailable(builder::payloadDiagnosticsListener);

@@ -6,7 +6,6 @@ import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiClient;
-import io.wangrollin.ai.client.AiProviderPreset;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
 import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
@@ -72,7 +71,9 @@ class AiSdkAutoConfigurationTest {
     @Test
     void failsFastWhenRequiredConfigurationIsMissing() {
         contextRunner
-                .withPropertyValues("ai.sdk.api-key=test-key")
+                .withPropertyValues(
+                        "ai.sdk.api-key=test-key",
+                        "ai.sdk.base-url=http://localhost")
                 .run(context -> {
                     assertTrue(hasCauseMessage(context.getStartupFailure(), "ai.sdk.model must be configured"));
                 });
@@ -99,17 +100,14 @@ class AiSdkAutoConfigurationTest {
     }
 
     @Test
-    void bindsProviderPresetWithoutRequiringBaseUrl() {
+    void failsFastWhenBaseUrlIsMissing() {
         contextRunner
                 .withPropertyValues(
                         "ai.sdk.api-key=test-key",
                         "ai.sdk.model=test-model",
                         "ai.sdk.provider-preset=deepseek")
                 .run(context -> {
-                    AiSdkProperties properties = context.getBean(AiSdkProperties.class);
-
-                    assertEquals(AiProviderPreset.DEEPSEEK, properties.getProviderPreset());
-                    assertTrue(context.containsBean("aiClient"));
+                    assertTrue(hasCauseMessage(context.getStartupFailure(), "ai.sdk.base-url must be configured"));
                 });
     }
 
