@@ -97,7 +97,8 @@ more provider fields:
 - **Testing experience**: expand the fake client and examples so application tests can cover prompt
   assembly, fallback behavior, tool calls, structured output, failures, and streaming errors.
 - **Compatibility evidence**: document which OpenAI-compatible providers have been verified for chat,
-  streaming, tool calling, JSON output, and Responses API behavior.
+  streaming, tool calling, JSON output, and Responses API behavior. The current evidence matrix lives
+  in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
 - **Production control plane**: continue hardening timeout, cancellation, retry, telemetry, and
   redaction behavior before adding broader provider-specific abstractions.
 - **Adoption readiness**: keep examples compiled, publish clear migration and release notes, and
@@ -114,7 +115,9 @@ payload diagnostics, Spring Boot auto-configuration, provider presets, and in-me
 
 OpenAI-compatible APIs remain the default provider path. Anthropic support is implemented as a focused
 internal adapter for Claude Messages API chat calls; it intentionally does not pretend that Claude
-Messages is the same protocol as OpenAI Responses API.
+Messages is the same protocol as OpenAI Responses API. Provider presets are configuration shortcuts,
+not live compatibility promises; see [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) for the current
+evidence level behind each preset and capability.
 
 ## Requirements
 

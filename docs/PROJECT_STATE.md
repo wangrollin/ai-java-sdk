@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-13: Added `docs/COMPATIBILITY.md` to separate SDK-verified capabilities from preset-only
+  provider configuration and unsupported protocol claims across chat, streaming, tool calling, JSON
+  output, and Responses API behavior.
 - 2026-07-12: Added a README backend adoption quick path that connects the first-screen value
   proposition to the Spring Boot starter, the `support-ticket-triage` REST workflow, metadata-only
   telemetry, and `FakeAiClient` tests for service and HTTP boundaries.
@@ -75,7 +78,8 @@ Completion criteria:
 - Streaming behavior is easy to regress because failures often happen in timeout, interrupted network, partial output, and resource cleanup paths.
 - Documentation can drift from implementation unless examples and verification commands remain part of normal Maven checks.
 - The JDK 25 requirement may block the Java/Spring backend teams most likely to benefit from the SDK.
-- Provider presets can look like support promises unless backed by compatibility evidence.
+- Provider presets are now documented separately from compatibility claims, but most non-OpenAI
+  OpenAI-compatible presets still lack live-provider verification.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
 - The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
@@ -83,12 +87,12 @@ Completion criteria:
 
 ## Next Candidates
 
-1. Add a provider compatibility matrix for chat, streaming, tool calling, JSON output, and Responses
-   API behavior.
-2. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
+1. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
    or should be lowered in a future release.
-3. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
+2. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
    assertions, failures, and streaming errors.
+3. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
+   without committing credentials or sensitive payloads.
 
 ## Long-Term Goal Review
 

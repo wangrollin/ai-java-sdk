@@ -32,6 +32,25 @@ Implications:
 - Provider-specific capabilities should not reshape common public APIs unless the behavior is broadly useful and stable.
 - Adapter tests should protect the provider boundary from accidental wire-format leakage.
 
+## 2026-07-13 - Separate Provider Presets from Compatibility Claims
+
+Decision: Provider presets are configuration shortcuts and must not be treated as live-provider
+compatibility promises without recorded evidence.
+
+Context:
+
+- The SDK exposes presets for several OpenAI-compatible services, but local tests mostly verify the
+  shared OpenAI-compatible adapter rather than every live provider and model combination.
+- Java backend adopters need to know whether a capability is SDK-verified, live-provider verified,
+  preset-only, unsupported, or still unknown before relying on it in production.
+
+Implications:
+
+- `docs/COMPATIBILITY.md` is the source of truth for provider capability evidence.
+- New presets should update the compatibility matrix in the same change.
+- Live-provider verification should record capabilities and limitations without committing secrets,
+  API keys, prompts, model outputs, or raw provider payloads.
+
 ## 2026-07-12 - Add Claude Through the Internal Adapter Boundary
 
 Decision: Anthropic Claude support is implemented as a native Messages API adapter behind the existing internal provider boundary.
