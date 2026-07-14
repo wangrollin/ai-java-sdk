@@ -67,7 +67,7 @@ class ResponseStreamTest {
         assertTrue(inputStream.closed());
         assertEquals("Failed to read response stream", exception.getMessage());
         assertEquals(1, failures.size());
-        assertSame(exception, failures.getFirst());
+        assertSame(exception, failures.get(0));
         assertEquals(1, exception.getSuppressed().length);
         assertEquals("Failed to close response stream", exception.getSuppressed()[0].getMessage());
     }
@@ -85,7 +85,7 @@ class ResponseStreamTest {
 
         assertTrue(inputStream.closed());
         assertEquals(1, failures.size());
-        assertSame(exception, failures.getFirst());
+        assertSame(exception, failures.get(0));
         assertEquals(1, exception.getSuppressed().length);
         assertEquals("Failed to close response stream", exception.getSuppressed()[0].getMessage());
     }

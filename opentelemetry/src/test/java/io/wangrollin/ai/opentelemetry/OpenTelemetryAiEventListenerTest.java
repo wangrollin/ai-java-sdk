@@ -62,7 +62,7 @@ class OpenTelemetryAiEventListenerTest {
 
         List<SpanData> spans = telemetry.finishedSpans();
         assertEquals(1, spans.size());
-        SpanData span = spans.getFirst();
+        SpanData span = spans.get(0);
         assertEquals("ai.sdk.chat", span.getName());
         assertEquals(StatusCode.OK, span.getStatus().getStatusCode());
         assertEquals("custom.ai", span.getInstrumentationScopeInfo().getName());
@@ -166,7 +166,7 @@ class OpenTelemetryAiEventListenerTest {
         SpanData onlySpan() {
             List<SpanData> spans = finishedSpans();
             assertEquals(1, spans.size());
-            return spans.getFirst();
+            return spans.get(0);
         }
     }
 }

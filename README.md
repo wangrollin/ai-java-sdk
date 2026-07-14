@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml/badge.svg)](https://github.com/wangrollin/ai-java-sdk/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
-[![Java](https://img.shields.io/badge/java-25%2B-orange.svg)](pom.xml)
+[![Java](https://img.shields.io/badge/java-17%2B-orange.svg)](pom.xml)
 
 `ai-java-sdk` is a production-ready Java SDK for adding AI calls to backend services without
 rebuilding retries, streaming cleanup, safe logs, metrics, tracing, tests, and provider
@@ -102,8 +102,8 @@ more provider fields:
 - **Production control plane**: continue hardening timeout, cancellation, retry, telemetry, and
   redaction behavior before adding broader provider-specific abstractions.
 - **Adoption readiness**: keep examples compiled, publish clear migration and release notes, and
-  evaluate whether the current JDK 25 requirement blocks the Java/Spring users this project is meant
-  to serve.
+  preserve the Java 17 minimum baseline in CI so the SDK remains usable by established Java/Spring
+  backend teams.
 
 ## Current Status
 
@@ -113,6 +113,10 @@ clients, Anthropic Claude Messages chat support, streaming, tool-calling plumbin
 hints, safe lifecycle events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted
 payload diagnostics, Spring Boot auto-configuration, provider presets, and in-memory testing support.
 
+The SDK targets Java 17 bytecode and verifies the full build on both Java 17 and Java 25. This keeps
+the minimum runtime aligned with established Spring backend environments while continuously checking
+compatibility with a current JDK.
+
 OpenAI-compatible APIs remain the default provider path. Anthropic support is implemented as a focused
 internal adapter for Claude Messages API chat calls; it intentionally does not pretend that Claude
 Messages is the same protocol as OpenAI Responses API. Provider presets are configuration shortcuts,
@@ -121,7 +125,7 @@ evidence level behind each preset and capability.
 
 ## Requirements
 
-- JDK 25
+- JDK 17 or newer
 - Maven 3.9+
 
 Validate the project locally with:

@@ -209,7 +209,7 @@ public final class OpenAiChatCodec {
             return payload;
         }
         payload.put("role", item.role());
-        payload.put("content", item.content().isEmpty() ? "" : item.content().getFirst().text());
+        payload.put("content", item.content().isEmpty() ? "" : item.content().get(0).text());
         return payload;
     }
 

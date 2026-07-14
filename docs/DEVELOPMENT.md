@@ -4,7 +4,7 @@ This project is intended to be developed through small, verifiable AI coding ite
 
 ## Prerequisites
 
-- JDK 25
+- JDK 17 or newer
 - Maven 3.9+
 
 ## Standard Verification

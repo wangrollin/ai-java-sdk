@@ -59,7 +59,7 @@ class ChatStreamTest {
         assertTrue(inputStream.closed());
         assertEquals("Failed to read chat stream", exception.getMessage());
         assertEquals(1, failures.size());
-        assertSame(exception, failures.getFirst());
+        assertSame(exception, failures.get(0));
         assertEquals(1, exception.getSuppressed().length);
         assertEquals("Failed to close chat stream", exception.getSuppressed()[0].getMessage());
     }
@@ -77,7 +77,7 @@ class ChatStreamTest {
 
         assertTrue(inputStream.closed());
         assertEquals(1, failures.size());
-        assertSame(exception, failures.getFirst());
+        assertSame(exception, failures.get(0));
         assertEquals(1, exception.getSuppressed().length);
         assertEquals("Failed to close chat stream", exception.getSuppressed()[0].getMessage());
     }

@@ -48,7 +48,7 @@ class SupportTicketTriageControllerTest {
                         "Enterprise customer cannot download invoices.",
                         "billing-operations"));
 
-        ChatRequest request = fakeClient.requests().getFirst();
+        ChatRequest request = fakeClient.requests().get(0);
         assertThat(request.responseFormat()).isEqualTo(TriageSchemas.SUPPORT_TICKET_TRIAGE);
         assertThat(request.messages().get(1).content()).contains("ticket-123");
     }

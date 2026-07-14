@@ -42,11 +42,14 @@ Completion criteria:
 - Metrics, tracing, and diagnostics examples preserve conservative redaction defaults.
 - A provider compatibility matrix documents verified behavior for chat, streaming, tool calling,
   JSON output, and Responses API support.
-- The project records whether the JDK 25 requirement is acceptable for the intended Java/Spring
-  audience or should be lowered in a future release.
+- The project records and verifies a Java baseline appropriate for the intended Java/Spring
+  audience.
 
 ## Recent Progress
 
+- 2026-07-14: Lowered the published bytecode and build baseline from Java 25 to Java 17 after
+  confirming that current dependencies and SDK language features support it; CI now verifies the
+  full reactor on Java 17 and Java 25.
 - 2026-07-13: Added `docs/COMPATIBILITY.md` to separate SDK-verified capabilities from preset-only
   provider configuration and unsupported protocol claims across chat, streaming, tool calling, JSON
   output, and Responses API behavior.
@@ -77,7 +80,6 @@ Completion criteria:
 - Observability can become unsafe if future events include prompts, outputs, raw bodies, API keys, or tool arguments by default.
 - Streaming behavior is easy to regress because failures often happen in timeout, interrupted network, partial output, and resource cleanup paths.
 - Documentation can drift from implementation unless examples and verification commands remain part of normal Maven checks.
-- The JDK 25 requirement may block the Java/Spring backend teams most likely to benefit from the SDK.
 - Provider presets are now documented separately from compatibility claims, but most non-OpenAI
   OpenAI-compatible presets still lack live-provider verification.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
@@ -87,16 +89,17 @@ Completion criteria:
 
 ## Next Candidates
 
-1. Review whether the JDK 25 requirement is acceptable for the intended Java/Spring backend audience
-   or should be lowered in a future release.
-2. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
+1. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
    assertions, failures, and streaming errors.
-3. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
+2. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
    without committing credentials or sensitive payloads.
+3. Add release and migration guidance that makes the Java 17 runtime baseline and supported module
+   combinations explicit for backend adopters.
 
 ## Long-Term Goal Review
 
 The recommended direction is now narrower and more adoption-focused: build a production-ready
 Java/Spring backend AI integration SDK. Future work should prioritize backend workflow evidence,
 testing support, safe observability, and verified provider compatibility over broad API surface area
-or agent-framework ambitions.
+or agent-framework ambitions. The Java 17 baseline supports this direction and does not require a
+change to the long-term goal.

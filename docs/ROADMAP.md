@@ -34,8 +34,8 @@ Focus areas:
 - Optional metrics, tracing, and redacted diagnostics that preserve conservative defaults.
 - Provider compatibility evidence for OpenAI-compatible chat, streaming, tool calling, JSON output,
   and Responses API behavior.
-- Adoption readiness work such as README messaging, migration notes, release notes, and a JDK
-  baseline review.
+- Adoption readiness work such as README messaging, migration notes, release notes, and preserving
+  the documented Java 17 baseline through normal CI verification.
 
 ## Later Candidate Milestones
 

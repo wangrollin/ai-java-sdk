@@ -44,7 +44,7 @@ class ProtocolMapperTest {
         assertEquals("chat-model", turn.model());
         assertEquals(3, turn.inputItems().size());
         assertEquals("system", turn.inputItems().get(0).role());
-        assertEquals("Hello", turn.inputItems().get(1).content().getFirst().text());
+        assertEquals("Hello", turn.inputItems().get(1).content().get(0).text());
         assertEquals(AiInputItem.Kind.TOOL_RESULT, turn.inputItems().get(2).kind());
         assertEquals("call-1", turn.inputItems().get(2).toolCallId());
         assertEquals(0.2, turn.temperature());
@@ -53,7 +53,7 @@ class ProtocolMapperTest {
         assertEquals(List.of("END"), turn.stopSequences());
         assertEquals("json_schema", turn.outputFormat().type());
         assertEquals("answer", turn.outputFormat().name());
-        assertEquals("lookup", turn.tools().getFirst().name());
+        assertEquals("lookup", turn.tools().get(0).name());
         assertEquals("function", turn.toolChoice().mode());
     }
 
@@ -80,8 +80,8 @@ class ProtocolMapperTest {
         assertEquals("low", turn.inputItems().get(0).content().get(1).detail());
         assertEquals(AiInputItem.Kind.TOOL_RESULT, turn.inputItems().get(1).kind());
         assertEquals("json_schema", turn.outputFormat().type());
-        assertEquals("lookup", turn.tools().getFirst().name());
-        assertEquals(true, turn.tools().getFirst().strict());
+        assertEquals("lookup", turn.tools().get(0).name());
+        assertEquals(true, turn.tools().get(0).strict());
         assertEquals("resp-1", turn.previousResponseId());
         assertEquals(true, turn.background());
     }

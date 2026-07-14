@@ -145,3 +145,25 @@ Implications:
   output, and Responses API behavior are verified.
 - Agent runtime abstractions, broad orchestration, and speculative provider-specific public APIs are
   out of scope unless future user evidence justifies them.
+
+## 2026-07-14 - Use Java 17 as the Minimum Runtime Baseline
+
+Decision: Published SDK artifacts target Java 17, and CI verifies the project on both Java 17 and a
+current JDK.
+
+Context:
+
+- Requiring Java 25 excluded established Java and Spring Boot environments without providing an
+  SDK capability that depended on Java 25.
+- The current Spring Boot, JUnit, Micrometer, OpenTelemetry, and Jackson dependencies support Java
+  17, and the SDK's language features are available in Java 17.
+- The only production source incompatibility was a convenience collection method introduced after
+  Java 17, so lowering the baseline did not require changing the public API or runtime behavior.
+
+Implications:
+
+- Production code, tests, and examples must avoid JDK APIs introduced after Java 17 unless the
+  minimum baseline is deliberately reconsidered.
+- Maven compiles with `--release 17`, and the build environment accepts JDK 17 or newer.
+- CI runs the complete verification path on Java 17 to protect the minimum baseline and on a current
+  JDK to detect forward-compatibility problems.
