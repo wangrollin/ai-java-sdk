@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-14: Added an opt-in, metadata-only live-provider compatibility probe for chat, streaming,
+  tool calling, structured JSON output, and Responses API behavior; documented a credential-safe
+  workflow and evidence record format without adding external calls to the default Maven or CI path.
 - 2026-07-14: Added focused `FakeAiClient` testing guidance and a build-compiled application example
   covering structured-output request assertions, tool-call fixtures, scripted fallback, stream-opening
   failures, and stream-consumption failures; added regression coverage for structured request history
@@ -88,6 +91,8 @@ Completion criteria:
   framework-neutral example and focused `FakeAiClientTest` coverage must remain aligned with them.
 - Provider presets are now documented separately from compatibility claims, but most non-OpenAI
   OpenAI-compatible presets still lack live-provider verification.
+- Live-provider verification is deliberately manual and model-specific; recorded evidence can become
+  stale when providers change model behavior or protocol compatibility.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
 - The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
@@ -95,11 +100,11 @@ Completion criteria:
 
 ## Next Candidates
 
-1. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
-   without committing credentials or sensitive payloads.
+1. Run the live-provider verification workflow against one existing non-OpenAI preset and record the
+   first model-specific evidence without committing credentials or provider payloads.
 2. Add release and migration guidance that makes the Java 17 runtime baseline and supported module
    combinations explicit for backend adopters.
-3. Audit the remaining M2 completion criteria after the verification and release guidance work, and
+3. Audit the remaining M2 completion criteria after the first live evidence and release guidance, and
    either close M2 or record the smallest remaining adoption gap.
 
 ## Long-Term Goal Review

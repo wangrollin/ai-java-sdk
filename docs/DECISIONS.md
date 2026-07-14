@@ -167,3 +167,26 @@ Implications:
 - Maven compiles with `--release 17`, and the build environment accepts JDK 17 or newer.
 - CI runs the complete verification path on Java 17 to protect the minimum baseline and on a current
   JDK to detect forward-compatibility problems.
+
+## 2026-07-14 - Keep Live Provider Verification Explicit and Credential-Free by Default
+
+Decision: Live-provider compatibility probes must be explicitly selected and configured through the
+runtime environment; they are not part of the default Maven verification or CI workflow.
+
+Context:
+
+- Real-provider calls require private credentials, may incur cost, and can become nondeterministic as
+  provider models and APIs change.
+- Local adapter tests prove SDK wire behavior but cannot establish that every preset and model accepts
+  the same capabilities in production.
+- Compatibility evidence is useful only when it can be reproduced without storing prompts, outputs,
+  credentials, or raw provider payloads.
+
+Implications:
+
+- `LiveProviderCompatibilityIT` is run by name and fails before sending requests when required runtime
+  configuration is missing or invalid.
+- The probe uses synthetic inputs, a bounded timeout, no retries, and metadata-only result output.
+- A capability is marked `Live verified` only after a successful run is recorded with date, preset,
+  model, tested capabilities, and limitations.
+- Default CI remains deterministic and never depends on provider credentials or availability.
