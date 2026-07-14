@@ -47,6 +47,10 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-14: Added focused `FakeAiClient` testing guidance and a build-compiled application example
+  covering structured-output request assertions, tool-call fixtures, scripted fallback, stream-opening
+  failures, and stream-consumption failures; added regression coverage for structured request history
+  and ordered failure/success outcomes.
 - 2026-07-14: Lowered the published bytecode and build baseline from Java 25 to Java 17 after
   confirming that current dependencies and SDK language features support it; CI now verifies the
   full reactor on Java 17 and Java 25.
@@ -80,6 +84,8 @@ Completion criteria:
 - Observability can become unsafe if future events include prompts, outputs, raw bodies, API keys, or tool arguments by default.
 - Streaming behavior is easy to regress because failures often happen in timeout, interrupted network, partial output, and resource cleanup paths.
 - Documentation can drift from implementation unless examples and verification commands remain part of normal Maven checks.
+- JUnit snippets in the testing guide are documentation rather than compiled test sources; the
+  framework-neutral example and focused `FakeAiClientTest` coverage must remain aligned with them.
 - Provider presets are now documented separately from compatibility claims, but most non-OpenAI
   OpenAI-compatible presets still lack live-provider verification.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
@@ -89,12 +95,12 @@ Completion criteria:
 
 ## Next Candidates
 
-1. Expand testing guidance with focused `FakeAiClient` examples for tool calls, structured output
-   assertions, failures, and streaming errors.
-2. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
+1. Define a small, repeatable live-provider verification workflow for compatibility matrix updates
    without committing credentials or sensitive payloads.
-3. Add release and migration guidance that makes the Java 17 runtime baseline and supported module
+2. Add release and migration guidance that makes the Java 17 runtime baseline and supported module
    combinations explicit for backend adopters.
+3. Audit the remaining M2 completion criteria after the verification and release guidance work, and
+   either close M2 or record the smallest remaining adoption gap.
 
 ## Long-Term Goal Review
 

@@ -679,6 +679,9 @@ set `ai.sdk.base-url`; presets expose reference endpoints but do not bind the ru
 
 Application code can depend on the `AiChatClient` or `AiResponseClient` interfaces and use `FakeAiClient` in unit tests. The fake is fully in-memory: it does not require an API key, never opens a network connection, and records requests so tests can assert the prompt and generation options sent by the application.
 
+For focused application-test patterns covering structured-output assertions, tool-call fixtures,
+scripted fallback, and stream-consumption failures, see [`docs/TESTING.md`](docs/TESTING.md).
+
 ```java
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiResponseClient;

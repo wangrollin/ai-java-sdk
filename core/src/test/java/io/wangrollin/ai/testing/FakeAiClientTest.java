@@ -4,6 +4,7 @@ import io.wangrollin.ai.chat.ChatDelta;
 import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
+import io.wangrollin.ai.chat.ChatResponseFormat;
 import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
@@ -48,6 +49,47 @@ class FakeAiClientTest {
         assertEquals(List.of(toolCall), secondResponse.toolCalls());
         assertEquals(List.of(firstRequest, secondRequest), client.requests());
         assertEquals("lookup_weather", client.requests().get(1).tools().get(0).name());
+    }
+
+    @Test
+    void recordsStructuredOutputRequestsForApplicationAssertions() {
+        ChatResponseFormat format = ChatResponseFormat.jsonSchema("ticket_triage", """
+                {
+                  "type": "object",
+                  "properties": {
+                    "queue": { "type": "string" }
+                  },
+                  "required": ["queue"]
+                }
+                """);
+        FakeAiClient client = FakeAiClient.builder()
+                .chatResponse("{\"queue\":\"billing\"}")
+                .build();
+
+        client.chat(ChatRequest.builder()
+                .message(ChatMessage.system("Return only JSON."))
+                .message(ChatMessage.user("The invoice export is failing."))
+                .responseFormat(format)
+                .build());
+
+        ChatRequest recorded = client.requests().get(0);
+        assertEquals(format, recorded.responseFormat());
+        assertEquals("The invoice export is failing.", recorded.messages().get(1).content());
+    }
+
+    @Test
+    void scriptsFailureThenSuccessForApplicationFallbackTests() {
+        FakeAiClient client = FakeAiClient.builder()
+                .chatFailure(new AiException("primary model unavailable"))
+                .chatResponse("fallback response")
+                .build();
+        ChatRequest request = ChatRequest.builder()
+                .message(ChatMessage.user("Summarize the incident."))
+                .build();
+
+        assertThrows(AiException.class, () -> client.chat(request));
+        assertEquals("fallback response", client.chat(request).text());
+        assertEquals(List.of(request, request), client.requests());
     }
 
     @Test
