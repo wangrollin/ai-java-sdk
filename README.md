@@ -128,6 +128,16 @@ evidence level behind each preset and capability.
 - JDK 17 or newer
 - Maven 3.9+
 
+## Version Status
+
+`v0.1.0` is the latest tagged release. The `main` branch documents the upcoming `0.2.0` release and
+builds as `0.2.0-SNAPSHOT`; several capabilities described below were added after `v0.1.0`. Build
+the snapshot locally with `mvn install` or consume it only from a trusted snapshot repository, and
+keep all SDK modules on the same version.
+
+See [`CHANGELOG.md`](CHANGELOG.md) for release contents and
+[`docs/UPGRADING.md`](docs/UPGRADING.md) for the `0.1.0` to `0.2.0` migration requirements.
+
 Validate the project locally with:
 
 ```shell
@@ -352,7 +362,7 @@ diagnostic messages.
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-micrometer</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -378,7 +388,7 @@ outputs, API keys, raw bodies, provider paths, base URLs, and diagnostic message
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-opentelemetry</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -628,7 +638,7 @@ injection for the default SDK client:
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-spring-boot-starter</artifactId>
-    <version>0.1.0</version>
+    <version>0.2.0-SNAPSHOT</version>
 </dependency>
 ```
 
@@ -746,7 +756,9 @@ sensitive values in the repository.
 ## Release Readiness
 
 The project metadata includes license, SCM, issue tracker, and maintainer information expected by
-public Maven repositories. Before publishing a release, run:
+public Maven repositories. Release contents and migration requirements must also be promoted from
+the unreleased sections in [`CHANGELOG.md`](CHANGELOG.md) and
+[`docs/UPGRADING.md`](docs/UPGRADING.md). Before publishing a release, run:
 
 ```shell
 mvn verify

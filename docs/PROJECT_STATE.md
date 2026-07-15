@@ -47,6 +47,9 @@ Completion criteria:
 
 ## Recent Progress
 
+- 2026-07-15: Moved post-v0.1.0 development to `0.2.0-SNAPSHOT`, added a changelog and focused
+  upgrade guide covering explicit base URLs, the Java 17 baseline, provider selection, and supported
+  module combinations; corrected contributor documentation that still required Java 25.
 - 2026-07-14: Added an opt-in, metadata-only live-provider compatibility probe for chat, streaming,
   tool calling, structured JSON output, and Responses API behavior; documented a credential-safe
   workflow and evidence record format without adding external calls to the default Maven or CI path.
@@ -93,6 +96,9 @@ Completion criteria:
   OpenAI-compatible presets still lack live-provider verification.
 - Live-provider verification is deliberately manual and model-specific; recorded evidence can become
   stale when providers change model behavior or protocol compatibility.
+- The upcoming `0.2.0` capabilities are documented and versioned as a snapshot but are not yet
+  published as a stable release; adopters must not assume that the tagged `v0.1.0` contains the new
+  provider and observability modules.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
 - The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
@@ -102,10 +108,10 @@ Completion criteria:
 
 1. Run the live-provider verification workflow against one existing non-OpenAI preset and record the
    first model-specific evidence without committing credentials or provider payloads.
-2. Add release and migration guidance that makes the Java 17 runtime baseline and supported module
-   combinations explicit for backend adopters.
-3. Audit the remaining M2 completion criteria after the first live evidence and release guidance, and
-   either close M2 or record the smallest remaining adoption gap.
+2. Audit the M2 completion criteria after the first live evidence and either close M2 or record the
+   smallest remaining adoption gap.
+3. Prepare the stable `0.2.0` release only after compatibility evidence and the M2 audit are complete,
+   including final changelog promotion and non-snapshot version verification.
 
 ## Long-Term Goal Review
 

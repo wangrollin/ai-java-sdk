@@ -15,11 +15,12 @@ Before opening a pull request:
 
 ## Requirements
 
-- JDK 25
+- JDK 17 or newer
 - Maven 3.9+
 
-The Maven build enforces these versions during validation so contributors see environment
-problems before they become CI-only failures.
+The Maven build enforces the minimum versions during validation so contributors see environment
+problems before they become CI-only failures. CI verifies the full reactor on Java 17 and Java 25
+to protect both the published baseline and forward compatibility with a current JDK.
 
 Run the same verification command as CI before submitting a pull request:
 

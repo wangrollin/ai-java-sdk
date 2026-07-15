@@ -190,3 +190,25 @@ Implications:
 - A capability is marked `Live verified` only after a successful run is recorded with date, preset,
   model, tested capabilities, and limitations.
 - Default CI remains deterministic and never depends on provider credentials or availability.
+
+## 2026-07-15 - Use the Next Snapshot Version on Main Between Releases
+
+Decision: After a release is tagged, ongoing development on `main` uses the next planned semantic
+version with a `-SNAPSHOT` suffix until release preparation removes the suffix.
+
+Context:
+
+- The `v0.1.0` tag contains the initial core and Spring Boot foundation, while later work added new
+  modules and provider capabilities without changing the Maven version from `0.1.0`.
+- Reusing a released coordinate for unreleased source can overwrite local Maven artifacts and makes
+  README dependency examples look available when the tagged release does not contain them.
+- The current post-`0.1.0` changes include additive capabilities and one documented configuration
+  migration, so `0.2.0-SNAPSHOT` is the appropriate pre-1.0 development line.
+
+Implications:
+
+- Parent and child POM versions must remain aligned on the same snapshot version during development.
+- README and upgrade documentation must distinguish the latest tagged release from capabilities on
+  `main`.
+- Release preparation should finalize the changelog, remove `-SNAPSHOT`, verify the reactor, and tag
+  the exact released commit before the next development version is chosen.
