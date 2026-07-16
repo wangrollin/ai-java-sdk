@@ -212,3 +212,23 @@ Implications:
   `main`.
 - Release preparation should finalize the changelog, remove `-SNAPSHOT`, verify the reactor, and tag
   the exact released commit before the next development version is chosen.
+
+## 2026-07-16 - Close M2 on Repository-Verifiable Criteria
+
+Decision: Close M2 when its documented completion criteria are satisfied by repository evidence and
+deterministic verification; do not make an external, credential-dependent live-provider call an
+implicit milestone gate.
+
+Context:
+
+- The M2 README, Spring Boot example, testing guidance, observability examples, compatibility matrix,
+  and Java 17 baseline criteria are all present and verified by `mvn verify`.
+- Live-provider verification requires private credentials, incurs external variability, and is
+  already explicitly modeled as an opt-in workflow.
+
+Implications:
+
+- M2 is completed on 2026-07-16, with its audit evidence recorded in `docs/PROJECT_STATE.md`.
+- The first non-OpenAI live evidence and stable `0.2.0` preparation form M3 - Release Readiness.
+- Compatibility claims remain unchanged until a live probe succeeds and its metadata-only evidence
+  is recorded.

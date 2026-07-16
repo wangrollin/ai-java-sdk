@@ -15,37 +15,40 @@ metrics, tracing, and testing support first-class.
 
 ## Current Milestone
 
-Name: M2 - Production Java Backend Adoption
+Name: M3 - v0.2.0 Release Readiness
 
 Status: in_progress
 
 Goal:
 
-- Make the SDK's adoption story obvious for Java and Spring Boot backend teams.
-- Demonstrate a realistic backend workflow that combines structured output, safe observability,
-  provider configuration, and in-memory tests.
-- Improve the testing experience so application code can cover AI behavior without API keys,
-  sockets, or provider availability.
-- Add compatibility evidence for OpenAI-compatible providers instead of accumulating unverified
-  provider promises.
-- Keep production safety centered on timeout, cancellation, retry, streaming, telemetry, and
-  redaction behavior.
+- Obtain the first model-specific live compatibility evidence for a non-OpenAI preset through the
+  existing opt-in, credential-free-by-default probe.
+- Audit release metadata, changelog, upgrade guidance, and snapshot-version removal needed for a
+  credible `0.2.0` release.
+- Preserve deterministic local and CI verification while keeping provider claims tied to recorded
+  evidence.
 
 Completion criteria:
 
-- README explains the project value in terms of safe Java backend AI integration within the first
-  screen.
-- A complete Spring Boot backend workflow example exists and is compiled or verified by the normal
-  project checks.
-- Testing guidance shows how to assert prompt assembly, structured output requests, failures, and
-  streaming behavior with `FakeAiClient`.
-- Metrics, tracing, and diagnostics examples preserve conservative redaction defaults.
-- A provider compatibility matrix documents verified behavior for chat, streaming, tool calling,
-  JSON output, and Responses API support.
-- The project records and verifies a Java baseline appropriate for the intended Java/Spring
-  audience.
+- At least one non-OpenAI preset has a successful live verification record with model, date,
+  capabilities, and limitations, without credentials or payloads in the repository.
+- Release documentation and Maven coordinates consistently describe the intended stable `0.2.0`
+  contents and migration path.
+- The full reactor remains green after release-preparation changes, including the Java 17 baseline.
+
+## M2 Audit Result
+
+M2 - Production Java Backend Adoption: completed on 2026-07-16. All six completion criteria were
+confirmed from repository evidence, and `mvn verify` completed successfully across the full reactor.
+The remaining non-OpenAI live-provider verification is an external, credential-dependent activity;
+it is intentionally tracked as the first M3 task rather than as a hidden M2 gate.
 
 ## Recent Progress
+
+- 2026-07-16: Audited M2 against its six completion criteria; all criteria are satisfied by the
+  README, Spring Boot workflow example, testing guidance, observability examples, compatibility
+  matrix, and Java 17 CI/build configuration. `mvn verify` passed for the complete reactor, so M3
+  now focuses on release readiness and the first model-specific live compatibility record.
 
 - 2026-07-15: Moved post-v0.1.0 development to `0.2.0-SNAPSHOT`, added a changelog and focused
   upgrade guide covering explicit base URLs, the Java 17 baseline, provider selection, and supported
@@ -108,10 +111,10 @@ Completion criteria:
 
 1. Run the live-provider verification workflow against one existing non-OpenAI preset and record the
    first model-specific evidence without committing credentials or provider payloads.
-2. Audit the M2 completion criteria after the first live evidence and either close M2 or record the
-   smallest remaining adoption gap.
-3. Prepare the stable `0.2.0` release only after compatibility evidence and the M2 audit are complete,
-   including final changelog promotion and non-snapshot version verification.
+2. Audit release metadata, changelog promotion, upgrade guidance, and publishing prerequisites for
+   the stable `0.2.0` release.
+3. Prepare the stable `0.2.0` release after the live evidence and release audit are complete,
+   including non-snapshot version verification.
 
 ## Long-Term Goal Review
 

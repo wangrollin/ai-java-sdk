@@ -17,7 +17,7 @@ Outcome:
 
 ## M2 - Production Java Backend Adoption
 
-Status: in_progress
+Status: completed (2026-07-16)
 
 Intent:
 
@@ -36,6 +36,31 @@ Focus areas:
   and Responses API behavior.
 - Adoption readiness work such as README messaging, migration notes, release notes, and preserving
   the documented Java 17 baseline through normal CI verification.
+
+Outcome:
+
+- README leads with safe Java backend adoption and a Spring Boot quick path.
+- The compiled `support-ticket-triage` workflow demonstrates structured output, safe telemetry,
+  externalized configuration, an HTTP boundary, and `FakeAiClient` tests.
+- Testing, diagnostics, metrics, tracing, compatibility, upgrade, and Java-baseline guidance are
+  documented and covered by the normal Maven verification path.
+
+## M3 - v0.2.0 Release Readiness
+
+Status: in_progress
+
+Intent:
+
+- Turn the post-v0.1.0 snapshot into a release that backend adopters can evaluate with explicit
+  compatibility evidence and a clear migration path.
+- Keep live-provider checks opt-in and metadata-only while preserving deterministic default CI.
+
+Focus areas:
+
+- Verify one non-OpenAI preset against a real model and record only safe, model-specific evidence.
+- Audit release metadata, changelog, upgrade documentation, publishing prerequisites, and removal
+  of `-SNAPSHOT` coordinates.
+- Run the full reactor verification after release-preparation changes before tagging `0.2.0`.
 
 ## Later Candidate Milestones
 
