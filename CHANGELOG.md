@@ -3,7 +3,9 @@
 This file records user-visible changes to `ai-java-sdk`. The repository follows Semantic Versioning;
 work on `main` uses the next `-SNAPSHOT` version until a release is prepared and tagged.
 
-## [Unreleased] - 0.2.0-SNAPSHOT
+## [Unreleased]
+
+## [0.2.0] - 2026-07-17
 
 ### Added
 
@@ -37,8 +39,7 @@ work on `main` uses the next `-SNAPSHOT` version until a release is prepared and
   while consuming a stream.
 - Documentation examples are compiled or backed by focused tests to reduce drift from public APIs.
 
-See [`docs/UPGRADING.md`](docs/UPGRADING.md) before moving an application from `0.1.0` to the
-upcoming `0.2.0` release.
+See [`docs/UPGRADING.md`](docs/UPGRADING.md) before moving an application from `0.1.0` to `0.2.0`.
 
 ## [0.1.0]
 
@@ -47,5 +48,6 @@ upcoming `0.2.0` release.
   Spring Boot auto-configuration, safe lifecycle events, redacted diagnostics, and `FakeAiClient`.
 - Established the initial Java-first SDK foundation.
 
-[Unreleased]: https://github.com/wangrollin/ai-java-sdk/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/wangrollin/ai-java-sdk/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/wangrollin/ai-java-sdk/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/wangrollin/ai-java-sdk/releases/tag/v0.1.0

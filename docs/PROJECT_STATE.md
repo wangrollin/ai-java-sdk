@@ -17,34 +17,35 @@ metrics, tracing, and testing support first-class.
 
 Name: M3 - v0.2.0 Release Readiness
 
-Status: in_progress
+Status: completed (2026-07-17)
 
 Goal:
 
-- Obtain the first model-specific live compatibility evidence for a non-OpenAI preset through the
-  existing opt-in, credential-free-by-default probe.
-- Audit release metadata, changelog, upgrade guidance, and snapshot-version removal needed for a
-  credible `0.2.0` release.
-- Preserve deterministic local and CI verification while keeping provider claims tied to recorded
-  evidence.
+- Publish a reproducible `v0.2.0` GitHub Release containing the four reusable SDK modules.
+- Promote release metadata, changelog, and upgrade guidance and remove snapshot versions.
+- Preserve deterministic local and CI verification without broadening provider compatibility claims.
 
 Completion criteria:
 
-- At least one non-OpenAI preset has a successful live verification record with model, date,
-  capabilities, and limitations, without credentials or payloads in the repository.
-- Release documentation and Maven coordinates consistently describe the intended stable `0.2.0`
-  contents and migration path.
-- The full reactor remains green after release-preparation changes, including the Java 17 baseline.
+- Release documentation and Maven coordinates consistently describe stable `0.2.0` contents and its
+  GitHub-only distribution model.
+- Main, sources, and javadoc jars are available for core, Spring Boot starter, Micrometer, and
+  OpenTelemetry; the example module is not published as an asset.
+- The full reactor remains green after release preparation, including the Java 17 baseline.
 
 ## M2 Audit Result
 
 M2 - Production Java Backend Adoption: completed on 2026-07-16. All six completion criteria were
 confirmed from repository evidence, and `mvn verify` completed successfully across the full reactor.
-The remaining non-OpenAI live-provider verification is an external, credential-dependent activity;
-it is intentionally tracked as the first M3 task rather than as a hidden M2 gate.
+The remaining non-OpenAI live-provider verification is an external, credential-dependent activity.
+It was initially tracked in M3 and was later retained as optional compatibility work rather than a
+`v0.2.0` release gate.
 
 ## Recent Progress
 
+- 2026-07-17: Prepared stable `0.2.0` coordinates and GitHub Release documentation for the four
+  reusable SDK modules. Live-provider verification remains opt-in compatibility work and is not a
+  release gate; compatibility claims remain limited to recorded evidence.
 - 2026-07-16: Audited M2 against its six completion criteria; all criteria are satisfied by the
   README, Spring Boot workflow example, testing guidance, observability examples, compatibility
   matrix, and Java 17 CI/build configuration. `mvn verify` passed for the complete reactor, so M3
@@ -99,9 +100,8 @@ it is intentionally tracked as the first M3 task rather than as a hidden M2 gate
   OpenAI-compatible presets still lack live-provider verification.
 - Live-provider verification is deliberately manual and model-specific; recorded evidence can become
   stale when providers change model behavior or protocol compatibility.
-- The upcoming `0.2.0` capabilities are documented and versioned as a snapshot but are not yet
-  published as a stable release; adopters must not assume that the tagged `v0.1.0` contains the new
-  provider and observability modules.
+- GitHub Release assets are not a Maven repository; adopters must build and install the tag locally
+  or manage downloaded jars and their transitive dependencies explicitly.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
 - The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
@@ -109,12 +109,10 @@ it is intentionally tracked as the first M3 task rather than as a hidden M2 gate
 
 ## Next Candidates
 
-1. Run the live-provider verification workflow against one existing non-OpenAI preset and record the
-   first model-specific evidence without committing credentials or provider payloads.
-2. Audit release metadata, changelog promotion, upgrade guidance, and publishing prerequisites for
-   the stable `0.2.0` release.
-3. Prepare the stable `0.2.0` release after the live evidence and release audit are complete,
-   including non-snapshot version verification.
+1. Continue live-provider verification as optional, model-specific compatibility evidence without
+   committing credentials or provider payloads.
+2. Start the next snapshot development line after the `v0.2.0` release is published.
+3. Prioritize deeper Spring Boot integration and testing support using the released Java 17 baseline.
 
 ## Long-Term Goal Review
 

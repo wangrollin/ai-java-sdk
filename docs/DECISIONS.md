@@ -229,6 +229,31 @@ Context:
 Implications:
 
 - M2 is completed on 2026-07-16, with its audit evidence recorded in `docs/PROJECT_STATE.md`.
-- The first non-OpenAI live evidence and stable `0.2.0` preparation form M3 - Release Readiness.
+- The first non-OpenAI live evidence and stable `0.2.0` preparation initially formed M3 - Release
+  Readiness; the 2026-07-17 decision below narrows the release gate to deterministic GitHub Release
+  preparation.
 - Compatibility claims remain unchanged until a live probe succeeds and its metadata-only evidence
   is recorded.
+
+## 2026-07-17 - Publish v0.2.0 Through GitHub Releases Only
+
+Decision: Publish `v0.2.0` as a GitHub Release containing the main, sources, and javadoc jars for the
+four reusable SDK modules. Do not make Maven Central setup or live non-OpenAI verification release
+gates.
+
+Context:
+
+- The project currently distributes releases through GitHub and does not have Maven Central signing,
+  staging, or deployment configuration.
+- Live-provider calls require credentials and external coordination, while the compatibility matrix
+  already distinguishes locally verified behavior from live-provider evidence.
+- The support-ticket triage module is a compiled source example rather than a reusable dependency.
+
+Implications:
+
+- Release assets include core, Spring Boot starter, Micrometer, and OpenTelemetry jars; the example
+  module is verified by the reactor but is not uploaded.
+- Users install the tagged source locally for normal Maven resolution or manage downloaded jars and
+  transitive dependencies directly.
+- Live-provider verification remains optional and does not expand compatibility claims until safe,
+  model-specific evidence is recorded.

@@ -2,9 +2,9 @@
 
 ## Version Status
 
-`v0.1.0` is the latest tagged release. The `main` branch and its documentation describe the
-upcoming `0.2.0` release and build as `0.2.0-SNAPSHOT`. Until `0.2.0` is published, use the snapshot
-only from a trusted repository or after building this source tree locally with `mvn install`.
+`v0.2.0` is the latest tagged release. It is published through GitHub Releases rather than Maven
+Central or another public Maven repository. Check out the tag and run `mvn install` for normal Maven
+dependency resolution, or download the GitHub release assets when managing jars directly.
 
 All SDK modules used by one application should use the same version. Do not mix a released core jar
 with snapshot integration modules.

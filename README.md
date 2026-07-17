@@ -130,10 +130,9 @@ evidence level behind each preset and capability.
 
 ## Version Status
 
-`v0.1.0` is the latest tagged release. The `main` branch documents the upcoming `0.2.0` release and
-builds as `0.2.0-SNAPSHOT`; several capabilities described below were added after `v0.1.0`. Build
-the snapshot locally with `mvn install` or consume it only from a trusted snapshot repository, and
-keep all SDK modules on the same version.
+`v0.2.0` is the latest tagged release. It is distributed through GitHub Releases rather than a
+public Maven repository. Build the tag locally with `mvn install`, or download the release assets
+from GitHub when managing the jars directly, and keep all SDK modules on the same version.
 
 See [`CHANGELOG.md`](CHANGELOG.md) for release contents and
 [`docs/UPGRADING.md`](docs/UPGRADING.md) for the `0.1.0` to `0.2.0` migration requirements.
@@ -362,7 +361,7 @@ diagnostic messages.
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-micrometer</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -388,7 +387,7 @@ outputs, API keys, raw bodies, provider paths, base URLs, and diagnostic message
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-opentelemetry</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -638,7 +637,7 @@ injection for the default SDK client:
 <dependency>
     <groupId>io.wangrollin.ai</groupId>
     <artifactId>ai-java-sdk-spring-boot-starter</artifactId>
-    <version>0.2.0-SNAPSHOT</version>
+    <version>0.2.0</version>
 </dependency>
 ```
 
@@ -753,20 +752,20 @@ The networked examples read `OPENAI_API_KEY` and `OPENAI_BASE_URL` from the envi
 Do not hard-code API keys, prompts containing private data, provider response bodies, or other
 sensitive values in the repository.
 
-## Release Readiness
+## Release Distribution
 
-The project metadata includes license, SCM, issue tracker, and maintainer information expected by
-public Maven repositories. Release contents and migration requirements must also be promoted from
-the unreleased sections in [`CHANGELOG.md`](CHANGELOG.md) and
-[`docs/UPGRADING.md`](docs/UPGRADING.md). Before publishing a release, run:
+Releases are published through GitHub Releases with the main, sources, and javadoc jars for the
+core, Spring Boot starter, Micrometer, and OpenTelemetry modules. The example application remains a
+source-only reactor module and is not uploaded as a release asset. Before publishing a release, run:
 
 ```shell
 mvn verify
 git status --short
 ```
 
-Release signing keys, repository tokens, and publishing credentials should be configured only in the
-publisher's local environment or CI secrets store; they should never be committed to this repository.
+GitHub tokens and other publishing credentials must remain in the publisher's local environment or
+CI secrets store; they must never be committed to this repository. The project is not currently
+published to Maven Central or another public Maven repository.
 
 ## License
 

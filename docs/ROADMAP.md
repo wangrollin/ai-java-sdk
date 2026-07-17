@@ -47,20 +47,19 @@ Outcome:
 
 ## M3 - v0.2.0 Release Readiness
 
-Status: in_progress
+Status: completed (2026-07-17)
 
 Intent:
 
-- Turn the post-v0.1.0 snapshot into a release that backend adopters can evaluate with explicit
-  compatibility evidence and a clear migration path.
-- Keep live-provider checks opt-in and metadata-only while preserving deterministic default CI.
+- Turn the post-v0.1.0 snapshot into a GitHub Release that backend adopters can evaluate with clear
+  compatibility boundaries and a migration path.
+- Keep live-provider checks opt-in and separate from deterministic release verification.
 
 Focus areas:
 
-- Verify one non-OpenAI preset against a real model and record only safe, model-specific evidence.
-- Audit release metadata, changelog, upgrade documentation, publishing prerequisites, and removal
-  of `-SNAPSHOT` coordinates.
-- Run the full reactor verification after release-preparation changes before tagging `0.2.0`.
+- Publish the four reusable SDK modules as main, sources, and javadoc jars on GitHub Releases.
+- Promote release metadata, changelog, and upgrade documentation, and remove `-SNAPSHOT` coordinates.
+- Run the full reactor verification before tagging `v0.2.0`.
 
 ## Later Candidate Milestones
 
