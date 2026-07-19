@@ -14,6 +14,8 @@ import io.wangrollin.ai.chat.ChatToolChoice;
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiProviderPreset;
 import io.wangrollin.ai.client.RetryPolicy;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
 import org.junit.jupiter.api.Test;
@@ -99,6 +101,7 @@ class LiveProviderCompatibilityIT {
                 case TOOL_CALLING -> verifyToolCalling(client);
                 case JSON_OUTPUT -> verifyJsonOutput(client);
                 case RESPONSES_API -> verifyResponsesApi(client);
+                case EMBEDDINGS -> verifyEmbeddings(client);
             }
             return CapabilityResult.passed(capability);
         } catch (Exception | AssertionError failure) {
@@ -168,6 +171,15 @@ class LiveProviderCompatibilityIT {
         assertFalse(result.text().isBlank(), "Responses API result must contain text");
     }
 
+    private static void verifyEmbeddings(AiClient client) {
+        EmbeddingResult result = client.embed(EmbeddingRequest.builder()
+                .input("Synthetic compatibility embedding input.")
+                .build());
+
+        assertEquals(1, result.embeddings().size(), "Provider must return one vector for one input");
+        assertFalse(result.embeddings().get(0).vector().isEmpty(), "Embedding vector must not be empty");
+    }
+
     private static void printSafeSummary(VerificationConfig config, List<CapabilityResult> results) {
         System.out.printf(
                 "compatibility-verification date=%s preset=%s model=%s%n",
@@ -191,7 +203,8 @@ class LiveProviderCompatibilityIT {
         STREAMING("streaming"),
         TOOL_CALLING("tool-calling"),
         JSON_OUTPUT("json-output"),
-        RESPONSES_API("responses-api");
+        RESPONSES_API("responses-api"),
+        EMBEDDINGS("embeddings");
 
         private final String externalName;
 

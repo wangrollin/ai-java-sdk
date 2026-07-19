@@ -35,6 +35,7 @@ public final class AiRedactionPolicy {
             "input",
             "instructions",
             "output_text",
+            "embedding",
             "text");
 
     private AiRedactionPolicy() {

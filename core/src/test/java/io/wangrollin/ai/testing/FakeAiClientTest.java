@@ -9,6 +9,9 @@ import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.chat.ChatTool;
 import io.wangrollin.ai.chat.ChatToolCall;
 import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.embedding.Embedding;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseRequest;
 import io.wangrollin.ai.response.ResponseResult;
@@ -24,6 +27,17 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 
 class FakeAiClientTest {
+    @Test
+    void returnsEmbeddingResultsAndRecordsRequests() {
+        EmbeddingResult expected = new EmbeddingResult(
+                "test-model", List.of(new Embedding(0, List.of(0.1, 0.2))), null);
+        FakeAiClient client = FakeAiClient.builder().embeddingResult(expected).build();
+        EmbeddingRequest request = EmbeddingRequest.builder().input("document").build();
+
+        assertEquals(expected, client.embed(request));
+        assertEquals(List.of(request), client.embeddingRequests());
+    }
+
     @Test
     void returnsConfiguredChatResponsesInOrderAndRecordsRequests() {
         ChatToolCall toolCall = new ChatToolCall("call-1", "lookup_weather", "{\"city\":\"Shanghai\"}");
@@ -180,11 +194,13 @@ class FakeAiClientTest {
         AiException streamFailure = new AiException("stream failed");
         AiException responseFailure = new AiException("response failed");
         AiException responseStreamFailure = new AiException("response stream failed");
+        AiException embeddingFailure = new AiException("embedding failed");
         FakeAiClient client = FakeAiClient.builder()
                 .chatFailure(chatFailure)
                 .streamFailure(streamFailure)
                 .responseFailure(responseFailure)
                 .responseStreamFailure(responseStreamFailure)
+                .embeddingFailure(embeddingFailure)
                 .build();
         ChatRequest request = ChatRequest.builder()
                 .message(ChatMessage.user("Hello"))
@@ -192,6 +208,7 @@ class FakeAiClientTest {
         ResponseRequest responseRequest = ResponseRequest.builder()
                 .input("Hello")
                 .build();
+        EmbeddingRequest embeddingRequest = EmbeddingRequest.builder().input("Hello").build();
 
         assertEquals(chatFailure, assertThrows(AiException.class, () -> client.chat(request)));
         assertEquals(streamFailure, assertThrows(AiException.class, () -> client.stream(request)));
@@ -199,8 +216,10 @@ class FakeAiClientTest {
         assertEquals(
                 responseStreamFailure,
                 assertThrows(AiException.class, () -> client.streamResponse(responseRequest)));
+        assertEquals(embeddingFailure, assertThrows(AiException.class, () -> client.embed(embeddingRequest)));
         assertEquals(List.of(request, request), client.requests());
         assertEquals(List.of(responseRequest, responseRequest), client.responseRequests());
+        assertEquals(List.of(embeddingRequest), client.embeddingRequests());
     }
 
     @Test
@@ -249,11 +268,15 @@ class FakeAiClientTest {
         AiException responseStreamException = assertThrows(
                 AiException.class,
                 () -> client.streamResponse(responseRequest));
+        AiException embeddingException = assertThrows(
+                AiException.class,
+                () -> client.embed(EmbeddingRequest.builder().input("Hello").build()));
 
         assertEquals("No fake chat response configured", chatException.getMessage());
         assertEquals("No fake stream response configured", streamException.getMessage());
         assertEquals("No fake response result configured", responseException.getMessage());
         assertEquals("No fake response stream configured", responseStreamException.getMessage());
+        assertEquals("No fake embedding result configured", embeddingException.getMessage());
     }
 
     @Test

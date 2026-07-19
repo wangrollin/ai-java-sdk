@@ -1,6 +1,9 @@
 package io.wangrollin.ai.internal.provider;
 
 import io.wangrollin.ai.error.AiError;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
+import io.wangrollin.ai.internal.openai.OpenAiEmbeddingCodec;
 import io.wangrollin.ai.internal.chat_completions_adapter.ChatCompletionsAdapter;
 import io.wangrollin.ai.internal.protocol.AiStreamEvent;
 import io.wangrollin.ai.internal.protocol.AiTurnRequest;
@@ -13,16 +16,36 @@ import java.util.Map;
  * Default adapter for OpenAI-compatible chat completions and Responses API endpoints.
  */
 public final class OpenAiCompatibleProviderAdapter implements AiProviderAdapter {
+    private static final String EMBEDDING_OPERATION = "embeddings";
     private static final String CHAT_OPERATION = "chat";
     private static final String CHAT_STREAM_OPERATION = "stream";
     private static final String RESPONSE_OPERATION = "response";
     private static final String RESPONSE_STREAM_OPERATION = "response.stream";
     private static final String CHAT_PATH = "/" + ChatCompletionsAdapter.PATH;
     private static final String RESPONSES_PATH = "/" + ResponsesAdapter.PATH;
+    private static final String EMBEDDINGS_PATH = "/" + OpenAiEmbeddingCodec.PATH;
     private static final Map<String, String> AUTH_HEADERS = Map.of("Authorization", "Bearer {apiKey}");
 
     private final ChatCompletionsAdapter chatCompletionsAdapter = new ChatCompletionsAdapter();
     private final ResponsesAdapter responsesAdapter = new ResponsesAdapter();
+    private final OpenAiEmbeddingCodec embeddingCodec = new OpenAiEmbeddingCodec();
+
+    @Override
+    public ProviderRequestSpec embeddingRequest(EmbeddingRequest request, String defaultModel) {
+        String model = request.model() == null ? defaultModel : request.model();
+        return new ProviderRequestSpec(
+                EMBEDDING_OPERATION,
+                EMBEDDINGS_PATH,
+                model,
+                false,
+                AUTH_HEADERS,
+                embeddingCodec.serializeRequest(request, defaultModel));
+    }
+
+    @Override
+    public EmbeddingResult parseEmbeddingResult(String body) {
+        return embeddingCodec.parseResult(body);
+    }
 
     @Override
     public ProviderRequestSpec chatRequest(AiTurnRequest request, String defaultModel, boolean stream) {

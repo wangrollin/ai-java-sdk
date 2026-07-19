@@ -5,7 +5,11 @@ import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.chat.ChatStream;
 import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.client.AiEmbeddingClient;
 import io.wangrollin.ai.client.AiResponseClient;
+import io.wangrollin.ai.embedding.Embedding;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.internal.openai.OpenAiChatCodec;
 import io.wangrollin.ai.internal.openai.OpenAiResponseCodec;
@@ -23,14 +27,14 @@ import java.util.Objects;
 import java.util.Queue;
 
 /**
- * In-memory {@link AiChatClient} and {@link AiResponseClient} for application tests.
+ * In-memory chat, Responses, and Embeddings client for application tests.
  *
  * <p>The fake records requests and returns preconfigured outcomes without
  * reading API keys, opening sockets, or depending on provider availability.
  * Configure one outcome per expected call; missing outcomes fail fast so tests
  * do not accidentally accept unexpected AI interactions.
  */
-public final class FakeAiClient implements AiChatClient, AiResponseClient {
+public final class FakeAiClient implements AiChatClient, AiResponseClient, AiEmbeddingClient {
     private static final OpenAiChatCodec OPEN_AI_CODEC = new OpenAiChatCodec();
     private static final OpenAiResponseCodec OPEN_AI_RESPONSE_CODEC = new OpenAiResponseCodec();
 
@@ -38,14 +42,17 @@ public final class FakeAiClient implements AiChatClient, AiResponseClient {
     private final Queue<Outcome<ChatStreamResponse>> streamOutcomes;
     private final Queue<Outcome<ResponseResult>> responseOutcomes;
     private final Queue<Outcome<ResponseStreamResponse>> responseStreamOutcomes;
+    private final Queue<Outcome<EmbeddingResult>> embeddingOutcomes;
     private final List<ChatRequest> requests = new ArrayList<>();
     private final List<ResponseRequest> responseRequests = new ArrayList<>();
+    private final List<EmbeddingRequest> embeddingRequests = new ArrayList<>();
 
     private FakeAiClient(Builder builder) {
         this.chatOutcomes = new ArrayDeque<>(builder.chatOutcomes);
         this.streamOutcomes = new ArrayDeque<>(builder.streamOutcomes);
         this.responseOutcomes = new ArrayDeque<>(builder.responseOutcomes);
         this.responseStreamOutcomes = new ArrayDeque<>(builder.responseStreamOutcomes);
+        this.embeddingOutcomes = new ArrayDeque<>(builder.embeddingOutcomes);
     }
 
     /**
@@ -97,6 +104,16 @@ public final class FakeAiClient implements AiChatClient, AiResponseClient {
         return outcome.resolve().stream();
     }
 
+    @Override
+    public EmbeddingResult embed(EmbeddingRequest request) {
+        embeddingRequests.add(Objects.requireNonNull(request, "request must not be null"));
+        Outcome<EmbeddingResult> outcome = embeddingOutcomes.poll();
+        if (outcome == null) {
+            throw new AiException("No fake embedding result configured");
+        }
+        return outcome.resolve();
+    }
+
     /**
      * Returns all requests in call order. The list is defensive so tests can
      * inspect calls without mutating the fake's internal history.
@@ -116,6 +133,15 @@ public final class FakeAiClient implements AiChatClient, AiResponseClient {
      */
     public List<ResponseRequest> responseRequests() {
         return List.copyOf(responseRequests);
+    }
+
+    /**
+     * Returns all embedding requests in call order.
+     *
+     * @return immutable embedding request history
+     */
+    public List<EmbeddingRequest> embeddingRequests() {
+        return List.copyOf(embeddingRequests);
     }
 
     private static ChatStream streamFrom(List<ChatDelta> deltas) {
@@ -197,6 +223,7 @@ public final class FakeAiClient implements AiChatClient, AiResponseClient {
         private final List<Outcome<ChatStreamResponse>> streamOutcomes = new ArrayList<>();
         private final List<Outcome<ResponseResult>> responseOutcomes = new ArrayList<>();
         private final List<Outcome<ResponseStreamResponse>> responseStreamOutcomes = new ArrayList<>();
+        private final List<Outcome<EmbeddingResult>> embeddingOutcomes = new ArrayList<>();
 
         private Builder() {
         }
@@ -354,6 +381,42 @@ public final class FakeAiClient implements AiChatClient, AiResponseClient {
             responseStreamOutcomes.add(new Outcome<>(
                     null,
                     Objects.requireNonNull(failure, "failure must not be null")));
+            return this;
+        }
+
+        /**
+         * Adds a complete embedding result outcome.
+         *
+         * @param result result returned by the next embedding call
+         * @return this builder
+         */
+        public Builder embeddingResult(EmbeddingResult result) {
+            embeddingOutcomes.add(new Outcome<>(Objects.requireNonNull(result, "result must not be null"), null));
+            return this;
+        }
+
+        /**
+         * Adds one vector as a convenient single-input embedding outcome.
+         *
+         * @param values vector components
+         * @return this builder
+         */
+        public Builder embeddingVector(Double... values) {
+            Objects.requireNonNull(values, "values must not be null");
+            return embeddingResult(new EmbeddingResult(
+                    null,
+                    List.of(new Embedding(0, List.of(values))),
+                    null));
+        }
+
+        /**
+         * Adds an embedding failure outcome.
+         *
+         * @param failure exception thrown by the next embedding call
+         * @return this builder
+         */
+        public Builder embeddingFailure(RuntimeException failure) {
+            embeddingOutcomes.add(new Outcome<>(null, Objects.requireNonNull(failure, "failure must not be null")));
             return this;
         }
 

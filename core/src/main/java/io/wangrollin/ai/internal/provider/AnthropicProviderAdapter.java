@@ -2,6 +2,8 @@ package io.wangrollin.ai.internal.provider;
 
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.internal.claude_messages_adapter.ClaudeMessagesAdapter;
 import io.wangrollin.ai.internal.protocol.AiStreamEvent;
 import io.wangrollin.ai.internal.protocol.AiTurnRequest;
@@ -21,6 +23,16 @@ public final class AnthropicProviderAdapter implements AiProviderAdapter {
             "anthropic-version", "2023-06-01");
 
     private final ClaudeMessagesAdapter claudeMessagesAdapter = new ClaudeMessagesAdapter();
+
+    @Override
+    public ProviderRequestSpec embeddingRequest(EmbeddingRequest request, String defaultModel) {
+        throw new AiException("Anthropic does not expose an Embeddings API through this SDK");
+    }
+
+    @Override
+    public EmbeddingResult parseEmbeddingResult(String body) {
+        throw new AiException("Anthropic does not expose an Embeddings API through this SDK");
+    }
 
     @Override
     public ProviderRequestSpec chatRequest(AiTurnRequest request, String defaultModel, boolean stream) {

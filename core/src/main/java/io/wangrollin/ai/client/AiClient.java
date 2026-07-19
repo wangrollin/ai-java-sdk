@@ -3,8 +3,12 @@ package io.wangrollin.ai.client;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.chat.ChatStream;
+import io.wangrollin.ai.chat.ChatUsage;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
 import io.wangrollin.ai.diagnostic.AiRedactionPolicy;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
+import io.wangrollin.ai.embedding.EmbeddingUsage;
 import io.wangrollin.ai.error.AiError;
 import io.wangrollin.ai.error.AiException;
 import io.wangrollin.ai.event.AiEventListener;
@@ -35,7 +39,7 @@ import java.util.Objects;
  * details stay inside an internal provider adapter so application code can
  * depend on the smaller {@link AiChatClient} contract where possible.
  */
-public final class AiClient implements AiChatClient, AiResponseClient {
+public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddingClient {
     /**
      * Default OpenAI-compatible API base URL.
      */
@@ -92,6 +96,63 @@ public final class AiClient implements AiChatClient, AiResponseClient {
      */
     public static Builder builder() {
         return new Builder();
+    }
+
+    @Override
+    public EmbeddingResult embed(EmbeddingRequest request) {
+        Objects.requireNonNull(request, "request must not be null");
+        ProviderRequestSpec providerRequest = providerAdapter.embeddingRequest(request, defaultModel);
+        HttpRequest httpRequest = providerHttpRequestBuilder(providerRequest)
+                .timeout(timeout)
+                .header("Content-Type", "application/json")
+                .POST(HttpRequest.BodyPublishers.ofString(providerRequest.body()))
+                .build();
+
+        AiHttpResult<String> result = httpExecutor.send(new AiHttpRequestSpec(
+                httpRequest,
+                "embedding request",
+                providerRequest.operation(),
+                providerRequest.model(),
+                providerRequest.path(),
+                false,
+                providerRequest.body()), HttpResponse.BodyHandlers.ofString());
+        HttpResponse<String> response = result.response();
+        if (response.statusCode() < 200 || response.statusCode() >= 300) {
+            httpExecutor.emitPayloadFailure(
+                    providerRequest.operation(), providerRequest.model(), providerRequest.path(), false,
+                    response.statusCode(), response.body());
+            AiException exception = providerResponseException(
+                    "Embedding request", response.statusCode(), response.body());
+            httpExecutor.emitFailure(
+                    providerRequest.operation(), providerRequest.model(), providerRequest.path(), false,
+                    result.attempt(), response.statusCode(), result.duration(), exception);
+            throw exception;
+        }
+        try {
+            httpExecutor.emitPayloadResponse(
+                    providerRequest.operation(), providerRequest.model(), providerRequest.path(), false,
+                    response.statusCode(), response.body());
+            EmbeddingResult embeddingResult = providerAdapter.parseEmbeddingResult(response.body());
+            validateEmbeddingResult(request, embeddingResult);
+            EmbeddingUsage usage = embeddingResult.usage();
+            httpExecutor.emitSuccess(
+                    providerRequest.operation(),
+                    eventModel(providerRequest.model(), embeddingResult.model()),
+                    providerRequest.path(),
+                    false,
+                    result.attempt(),
+                    response.statusCode(),
+                    result.duration(),
+                    null,
+                    usage == null ? null : new ChatUsage(
+                            usage.inputTokens(), 0, usage.totalTokens()));
+            return embeddingResult;
+        } catch (AiException e) {
+            httpExecutor.emitFailure(
+                    providerRequest.operation(), providerRequest.model(), providerRequest.path(), false,
+                    result.attempt(), response.statusCode(), result.duration(), e);
+            throw e;
+        }
     }
 
     @Override
@@ -380,6 +441,21 @@ public final class AiClient implements AiChatClient, AiResponseClient {
 
     private URI providerUri(ProviderRequestSpec providerRequest) {
         return baseUri.resolve(providerRequest.relativePath());
+    }
+
+    private static void validateEmbeddingResult(EmbeddingRequest request, EmbeddingResult result) {
+        if (result.embeddings().size() != request.inputs().size()) {
+            throw new AiException("Embedding response count does not match request input count");
+        }
+        for (int index = 0; index < result.embeddings().size(); index++) {
+            var embedding = result.embeddings().get(index);
+            if (embedding.index() != index) {
+                throw new AiException("Embedding response indices must cover every request input");
+            }
+            if (request.dimensions() != null && embedding.vector().size() != request.dimensions()) {
+                throw new AiException("Embedding response vector dimensions do not match the request");
+            }
+        }
     }
 
     private HttpRequest.Builder providerHttpRequestBuilder(ProviderRequestSpec providerRequest) {

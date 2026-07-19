@@ -4,6 +4,8 @@ import io.wangrollin.ai.chat.ChatDelta;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.chat.ChatResponse;
 import io.wangrollin.ai.error.AiError;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.internal.protocol.AiStreamEvent;
 import io.wangrollin.ai.internal.protocol.AiTurnRequest;
 import io.wangrollin.ai.internal.protocol.AiTurnResult;
@@ -20,6 +22,23 @@ import io.wangrollin.ai.response.ResponseResult;
  * parsing, streaming event parsing, and structured error extraction.
  */
 public interface AiProviderAdapter {
+    /**
+     * Creates a provider-specific embedding request specification.
+     *
+     * @param request public embedding request
+     * @param defaultModel model used when the request does not override it
+     * @return provider request specification
+     */
+    ProviderRequestSpec embeddingRequest(EmbeddingRequest request, String defaultModel);
+
+    /**
+     * Parses a complete embedding response body.
+     *
+     * @param body provider response body
+     * @return parsed embedding result
+     */
+    EmbeddingResult parseEmbeddingResult(String body);
+
     /**
      * Creates a provider-specific chat request specification.
      *
