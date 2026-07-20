@@ -2,6 +2,7 @@ package io.wangrollin.ai.spring.autoconfigure;
 
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.AiEmbeddingClient;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.client.RetryPolicy;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
@@ -22,15 +23,17 @@ import java.util.Set;
  *
  * <p>The starter creates exactly one default {@link AiClient} when the
  * application has not supplied its own SDK client. The concrete bean implements
- * both {@link AiChatClient} and {@link AiResponseClient}, so application code can
- * depend on the narrower interface it needs.
+ * {@link AiChatClient}, {@link AiResponseClient}, and {@link AiEmbeddingClient},
+ * so application code can depend on the narrower interface it needs.
  */
 @AutoConfiguration
 @ConditionalOnClass(AiClient.class)
 @EnableConfigurationProperties(AiSdkProperties.class)
 public class AiSdkAutoConfiguration {
     @Bean
-    @ConditionalOnMissingBean({AiClient.class, AiChatClient.class, AiResponseClient.class})
+    @ConditionalOnMissingBean({
+            AiClient.class, AiChatClient.class, AiResponseClient.class, AiEmbeddingClient.class
+    })
     AiClient aiClient(
             AiSdkProperties properties,
             ObjectProvider<AiEventListener> eventListener,

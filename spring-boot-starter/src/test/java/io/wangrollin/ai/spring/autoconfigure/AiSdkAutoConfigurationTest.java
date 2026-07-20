@@ -6,8 +6,10 @@ import io.wangrollin.ai.chat.ChatMessage;
 import io.wangrollin.ai.chat.ChatRequest;
 import io.wangrollin.ai.client.AiChatClient;
 import io.wangrollin.ai.client.AiClient;
+import io.wangrollin.ai.client.AiEmbeddingClient;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.diagnostic.AiPayloadDiagnosticsListener;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
 import io.wangrollin.ai.diagnostic.AiPayloadRequestEvent;
 import io.wangrollin.ai.diagnostic.AiRedactionPolicy;
 import io.wangrollin.ai.event.AiEventListener;
@@ -46,10 +48,18 @@ class AiSdkAutoConfigurationTest {
     }
 
     @Test
-    void createsAiClientForChatAndResponsesInterfaces() throws Exception {
-        startServer(exchange -> respond(exchange, 200, """
-                {"choices":[{"message":{"content":"ok"}}]}
-                """));
+    void createsAiClientForAllNarrowInterfaces() throws Exception {
+        startServer(exchange -> {
+            if ("/embeddings".equals(exchange.getRequestURI().getPath())) {
+                respond(exchange, 200, """
+                        {"data":[{"index":0,"embedding":[0.1,0.2]}]}
+                        """);
+                return;
+            }
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok"}}]}
+                    """);
+        });
 
         contextRunner
                 .withPropertyValues(requiredProperties())
@@ -58,6 +68,7 @@ class AiSdkAutoConfigurationTest {
                     AiClient client = context.getBean(AiClient.class);
                     assertSame(client, context.getBean(AiChatClient.class));
                     assertSame(client, context.getBean(AiResponseClient.class));
+                    assertSame(client, context.getBean(AiEmbeddingClient.class));
 
                     String text = context.getBean(AiChatClient.class)
                             .chat(ChatRequest.builder()
@@ -65,6 +76,9 @@ class AiSdkAutoConfigurationTest {
                                     .build())
                             .text();
                     assertEquals("ok", text);
+                    assertEquals(1, context.getBean(AiEmbeddingClient.class)
+                            .embed(EmbeddingRequest.builder().input("document").build())
+                            .embeddings().size());
                 });
     }
 
