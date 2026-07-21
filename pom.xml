@@ -20,6 +20,7 @@
         <module>opentelemetry</module>
         <module>spring-boot-starter</module>
         <module>examples/support-ticket-triage</module>
+        <module>examples/knowledge-base-rag</module>
     </modules>
 
     <licenses>
