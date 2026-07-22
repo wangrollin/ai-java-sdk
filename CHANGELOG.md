@@ -5,6 +5,21 @@ work on `main` uses the next `-SNAPSHOT` version until a release is prepared and
 
 ## [Unreleased]
 
+### Added
+
+- A typed, synchronous Embeddings API with batch input, request-level model overrides, optional
+  dimensions, ordered vector results, and token usage metadata for OpenAI-compatible providers.
+- Embedding support in `FakeAiClient`, Spring Boot auto-configuration, lifecycle telemetry, redacted
+  diagnostics, and the opt-in live compatibility probe.
+- A compiled Spring Boot knowledge-base RAG example using a synthetic corpus, in-memory cosine
+  retrieval, grounded chat generation, and deterministic fake-client tests.
+
+### Changed
+
+- Development on `main` now uses `0.3.0-SNAPSHOT` after the `v0.2.0` release.
+- Default payload diagnostics redact embedding vectors in addition to prompts, model output, tool
+  arguments, and credentials.
+
 ## [0.2.0] - 2026-07-17
 
 ### Added

@@ -61,6 +61,35 @@ Focus areas:
 - Promote release metadata, changelog, and upgrade documentation, and remove `-SNAPSHOT` coordinates.
 - Run the full reactor verification before tagging `v0.2.0`.
 
+## M4 - v0.3.0 Embeddings and RAG Foundation
+
+Status: in progress
+
+Intent:
+
+- Expand the SDK from reliable text generation into the backend primitives needed for basic
+  retrieval-augmented generation workflows.
+- Keep vector storage and document-ingestion policy application-owned instead of prematurely
+  freezing a broad RAG framework API.
+
+Focus areas:
+
+- A typed synchronous Embeddings API with batch input, request-level model selection, optional
+  dimensions, token usage, safe diagnostics, and OpenAI-compatible transport support.
+- `FakeAiClient`, Spring Boot injection, lifecycle telemetry, and optional live compatibility probes
+  for embedding calls.
+- A compiled Spring Boot example that embeds a synthetic corpus, performs in-memory cosine retrieval,
+  and builds a grounded chat request without introducing a vector-store abstraction.
+- Prepare and verify the `0.3.0-SNAPSHOT` development line before a later GitHub Release.
+
+Completion criteria:
+
+- Core, starter, fake-client, telemetry, compatibility, and example coverage pass the full Java 17
+  reactor verification.
+- Documentation distinguishes OpenAI-compatible SDK evidence, preset-only providers, and Anthropic's
+  intentionally unsupported Embeddings capability.
+- Release preparation can remove `-SNAPSHOT` and publish `v0.3.0` without additional feature work.
+
 ## Later Candidate Milestones
 
 ### Spring Boot Production Integration

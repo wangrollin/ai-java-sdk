@@ -1,6 +1,7 @@
 # Testing AI-Integrated Application Code
 
-`FakeAiClient` lets application tests exercise the SDK's `AiChatClient` and `AiResponseClient`
+`FakeAiClient` lets application tests exercise the SDK's `AiChatClient`, `AiResponseClient`, and
+`AiEmbeddingClient`
 contracts without API keys, network access, or provider availability. Configure outcomes in expected
 call order, pass the fake through the narrow client interface used by the application, and assert the
 requests recorded after the application code runs.
@@ -8,6 +9,28 @@ requests recorded after the application code runs.
 The examples below use JUnit 5. A compilable framework-neutral version lives in
 `core/src/examples/java/io/wangrollin/ai/examples/FakeAiClientExample.java` and is checked by the
 normal Maven build.
+
+## Assert Embedding Batches and Retrieval Inputs
+
+Embedding workflows use the same ordered-outcome model. Configure a complete batch with
+`embeddingResult(...)` or a convenient single vector with `embeddingVector(...)`, then inspect
+`embeddingRequests()` to verify document batching, model selection, dimensions, and query inputs.
+
+```java
+FakeAiClient fake = FakeAiClient.builder()
+    .embeddingVector(0.1, 0.2, 0.3)
+    .build();
+
+fake.embed(EmbeddingRequest.builder()
+    .model("text-embedding-test")
+    .input("synthetic document")
+    .build());
+
+assertEquals("text-embedding-test", fake.embeddingRequests().get(0).model());
+```
+
+The compiled `examples/knowledge-base-rag` module demonstrates batch indexing, query embedding,
+cosine retrieval, and grounded prompt assertions without a provider account or vector database.
 
 ## Assert Prompt Assembly and Structured Output
 

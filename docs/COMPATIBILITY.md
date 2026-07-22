@@ -17,15 +17,15 @@ claim that every provider preset has been verified against a live provider accou
 
 ## Capability Matrix
 
-| Preset | Protocol | Chat | Streaming | Tool calling | JSON output | Responses API |
-| --- | --- | --- | --- | --- | --- | --- |
-| `OPENAI` | OpenAI-compatible | SDK verified | SDK verified | SDK verified | SDK verified | SDK verified |
-| `DEEPSEEK` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified |
-| `QWEN` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified |
-| `MOONSHOT` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified |
-| `ZHIPU` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified |
-| `OPENROUTER` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified |
-| `ANTHROPIC` | Claude Messages API | SDK verified | SDK verified | SDK verified | Not supported | Not supported |
+| Preset | Protocol | Chat | Streaming | Tool calling | JSON output | Responses API | Embeddings |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `OPENAI` | OpenAI-compatible | SDK verified | SDK verified | SDK verified | SDK verified | SDK verified | SDK verified |
+| `DEEPSEEK` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified | Preset only |
+| `QWEN` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified | Preset only |
+| `MOONSHOT` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified | Preset only |
+| `ZHIPU` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified | Preset only |
+| `OPENROUTER` | OpenAI-compatible | Preset only | Preset only | Not verified | Not verified | Not verified | Preset only |
+| `ANTHROPIC` | Claude Messages API | SDK verified | SDK verified | SDK verified | Not supported | Not supported | Not supported |
 
 ## Notes
 
@@ -36,6 +36,9 @@ claim that every provider preset has been verified against a live provider accou
   OpenAI-compatible provider accepts every OpenAI feature.
 - Anthropic uses the native Claude Messages API adapter. It supports chat, streaming text, and basic
   function-tool calls through `AiChatClient`, but `AiResponseClient` remains OpenAI-compatible only.
+- Embeddings use the OpenAI-compatible `/embeddings` wire shape. The SDK supports batch text input,
+  optional dimensions, floating-point vectors, and usage metadata; it does not map Anthropic chat
+  models to an unrelated embedding provider.
 - Future live-provider verification should record the provider, model, API date when relevant,
   capabilities tested, and any provider-specific limitations without committing credentials or
   sensitive payloads.
@@ -66,6 +69,7 @@ All five variables are required. `AI_COMPAT_PROVIDER_PRESET` must name an `AiPro
 - `tool-calling`: require the named synthetic function and validate its JSON arguments.
 - `json-output`: request a strict synthetic JSON schema and validate the returned object.
 - `responses-api`: require a non-empty result through `AiResponseClient`.
+- `embeddings`: require one non-empty vector for one synthetic input through `AiEmbeddingClient`.
 
 The probe uses synthetic inputs, a 30-second timeout, and no retries. It prints only the UTC date,
 preset, model, capability names, pass/fail status, and failure class. It does not print the API key,

@@ -257,3 +257,26 @@ Implications:
   transitive dependencies directly.
 - Live-provider verification remains optional and does not expand compatibility claims until safe,
   model-specific evidence is recorded.
+
+## 2026-07-17 - Make Embeddings the M4 Capability Boundary
+
+Decision: M4 adds a typed OpenAI-compatible Embeddings API and a complete in-memory RAG example, but
+does not add a public vector-store, document-ingestion, chunking, or agent-runtime abstraction.
+
+Context:
+
+- Chat, Responses, structured-output, tool-call, and image-input plumbing already cover the main
+  generation path, while retrieval workflows still lack a basic vector-generation primitive.
+- Vector storage and ingestion policy vary substantially across applications and databases; adding
+  those abstractions without usage evidence would freeze speculative public APIs.
+- Generation and embedding models are normally different, so the example uses request-level model
+  overrides while the starter keeps its existing single default-model contract.
+
+Implications:
+
+- `AiEmbeddingClient` is synchronous and batch-oriented; streaming embeddings are out of scope.
+- OpenAI-compatible providers receive `/embeddings` requests, while Anthropic fails explicitly as
+  unsupported instead of silently routing to another service.
+- The RAG example owns synthetic documents, cosine retrieval, and prompt assembly, demonstrating the
+  workflow without presenting the in-memory implementation as production infrastructure.
+- M4 remains on GitHub Release distribution; Maven Central is deferred rather than made a feature gate.

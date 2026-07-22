@@ -60,6 +60,7 @@ The SDK now includes the first production-oriented layers around that foundation
 - [x] Spring Boot auto-configuration for configuration binding and dependency injection.
 - [x] Internal provider adapter boundary with OpenAI-compatible support as the default implementation.
 - [x] Provider presets for common OpenAI-compatible model services and Anthropic.
+- [x] Batch-oriented OpenAI-compatible Embeddings API with ordered vectors and token usage.
 - [x] Compilable examples for chat, streaming, responses, tool calling, diagnostics, metrics, and tests.
 
 ## Spring Boot Workflow Example
@@ -69,14 +70,19 @@ Boot REST workflow that accepts support tickets over HTTP, uses the starter conf
 structured JSON output for support-ticket routing, wires metadata-only lifecycle logging, and tests
 the service and controller with `FakeAiClient` instead of API keys or sockets.
 
+For retrieval-augmented generation, `examples/knowledge-base-rag` embeds a synthetic corpus in one
+batch, performs in-memory cosine retrieval, and sends selected context through `AiChatClient`. It
+demonstrates separate request-level embedding and chat models while leaving durable vector storage,
+ingestion, and chunking to the application.
+
 ## Backend Adoption Quick Path
 
 For a Spring Boot backend team, the shortest path is:
 
 1. Add `ai-java-sdk-spring-boot-starter` and configure `ai.sdk.*` from environment-backed
    application properties.
-2. Depend on the narrow interface the service needs, usually `AiChatClient` for chat-style
-   workflows or `AiResponseClient` for OpenAI-compatible Responses API calls.
+2. Depend on the narrow interface the service needs: `AiChatClient`, `AiResponseClient`, or
+   `AiEmbeddingClient`.
 3. Model the AI boundary as ordinary backend code: assemble prompts, request structured JSON when
    the service needs typed routing decisions, and keep lifecycle logging metadata-only by default.
 4. Test the service and HTTP boundary with `FakeAiClient`, asserting prompt assembly, structured
@@ -97,7 +103,7 @@ more provider fields:
 - **Testing experience**: expand the fake client and examples so application tests can cover prompt
   assembly, fallback behavior, tool calls, structured output, failures, and streaming errors.
 - **Compatibility evidence**: document which OpenAI-compatible providers have been verified for chat,
-  streaming, tool calling, JSON output, and Responses API behavior. The current evidence matrix lives
+  streaming, tool calling, JSON output, Responses API, and Embeddings behavior. The current evidence matrix lives
   in [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md).
 - **Production control plane**: continue hardening timeout, cancellation, retry, telemetry, and
   redaction behavior before adding broader provider-specific abstractions.
@@ -130,7 +136,8 @@ evidence level behind each preset and capability.
 
 ## Version Status
 
-`v0.2.0` is the latest tagged release. It is distributed through GitHub Releases rather than a
+`v0.2.0` is the latest tagged release. Development on `main` uses `0.3.0-SNAPSHOT` for the M4
+Embeddings and RAG work. Releases are distributed through GitHub Releases rather than a
 public Maven repository. Build the tag locally with `mvn install`, or download the release assets
 from GitHub when managing the jars directly, and keep all SDK modules on the same version.
 
@@ -153,6 +160,7 @@ The first implementation milestone supports synchronous and streaming OpenAI-com
 ```java
 import io.wangrollin.ai.client.AiClient;
 import io.wangrollin.ai.client.AiChatClient;
+import io.wangrollin.ai.client.AiEmbeddingClient;
 import io.wangrollin.ai.client.AiResponseClient;
 import io.wangrollin.ai.client.AiProvider;
 import io.wangrollin.ai.client.RetryPolicy;
@@ -171,6 +179,8 @@ import io.wangrollin.ai.diagnostic.LoggingAiPayloadDiagnosticsListener;
 import io.wangrollin.ai.event.AiMetricsSnapshot;
 import io.wangrollin.ai.event.InMemoryAiMetricsListener;
 import io.wangrollin.ai.event.LoggingAiEventListener;
+import io.wangrollin.ai.embedding.EmbeddingRequest;
+import io.wangrollin.ai.embedding.EmbeddingResult;
 import io.wangrollin.ai.response.ResponseDelta;
 import io.wangrollin.ai.response.ResponseInputMessage;
 import io.wangrollin.ai.response.ResponseInputPart;
@@ -182,8 +192,9 @@ import io.wangrollin.ai.response.ResponseTool;
 import io.wangrollin.ai.response.ResponseToolCall;
 
 import java.time.Duration;
+import java.util.List;
 
-AiChatClient client = AiClient.builder()
+AiClient client = AiClient.builder()
     .apiKey(System.getenv("OPENAI_API_KEY"))
     .provider(AiProvider.OPENAI_COMPATIBLE)
     .baseUrl(System.getenv("OPENAI_BASE_URL"))
@@ -197,6 +208,21 @@ ChatResponse response = client.chat(ChatRequest.builder()
     .build());
 
 System.out.println(response.text());
+```
+
+OpenAI-compatible embedding models are available through `AiEmbeddingClient`. Batch input returns
+vectors ordered by provider input index, and the request can select a model independently from the
+client's default generation model.
+
+```java
+AiEmbeddingClient embeddings = client;
+EmbeddingResult result = embeddings.embed(EmbeddingRequest.builder()
+    .model("text-embedding-3-small")
+    .inputs(List.of("first synthetic document", "second synthetic document"))
+    .dimensions(256)
+    .build());
+
+List<Double> firstVector = result.embeddings().get(0).vector();
 ```
 
 Request-level generation options can be set when a call needs to override the provider defaults:

@@ -15,23 +15,24 @@ metrics, tracing, and testing support first-class.
 
 ## Current Milestone
 
-Name: M3 - v0.2.0 Release Readiness
+Name: M4 - v0.3.0 Embeddings and RAG Foundation
 
-Status: completed (2026-07-17)
+Status: in progress
 
 Goal:
 
-- Publish a reproducible `v0.2.0` GitHub Release containing the four reusable SDK modules.
-- Promote release metadata, changelog, and upgrade guidance and remove snapshot versions.
-- Preserve deterministic local and CI verification without broadening provider compatibility claims.
+- Add a typed, batch-oriented Embeddings API for OpenAI-compatible providers.
+- Prove a complete Java backend RAG workflow without introducing a vector-store framework.
+- Preserve safe observability, deterministic testing, provider boundaries, and the Java 17 baseline.
 
 Completion criteria:
 
-- Release documentation and Maven coordinates consistently describe stable `0.2.0` contents and its
-  GitHub-only distribution model.
-- Main, sources, and javadoc jars are available for core, Spring Boot starter, Micrometer, and
-  OpenTelemetry; the example module is not published as an asset.
-- The full reactor remains green after release preparation, including the Java 17 baseline.
+- `AiEmbeddingClient` supports batch input, model overrides, optional dimensions, ordered vectors,
+  usage metadata, retry/error behavior, and redacted diagnostics.
+- Spring Boot, `FakeAiClient`, compatibility probes, and lifecycle telemetry support Embeddings.
+- A compiled Spring Boot example demonstrates synthetic corpus indexing, cosine retrieval, grounded
+  generation, and deterministic fake-client tests.
+- The full reactor remains green on the `0.3.0-SNAPSHOT` line before release preparation.
 
 ## M2 Audit Result
 
@@ -43,6 +44,12 @@ It was initially tracked in M3 and was later retained as optional compatibility 
 
 ## Recent Progress
 
+- 2026-07-17: Started M4 on `0.3.0-SNAPSHOT` with a typed OpenAI-compatible Embeddings API, batch
+  requests, ordered vector results, usage metadata, safe vector redaction, fake-client fixtures,
+  Spring Boot injection, and an optional live compatibility capability. Added a compiled in-memory
+  RAG example using a synthetic corpus, cosine retrieval, request-level embedding/chat models, and
+  deterministic tests without a vector-store abstraction. Full `mvn verify` passed across all seven
+  reactor modules; the remaining M4 step is explicit `v0.3.0` release preparation and publication.
 - 2026-07-17: Prepared stable `0.2.0` coordinates and GitHub Release documentation for the four
   reusable SDK modules. Live-provider verification remains opt-in compatibility work and is not a
   release gate; compatibility claims remain limited to recorded evidence.
@@ -102,6 +109,10 @@ It was initially tracked in M3 and was later retained as optional compatibility 
   stale when providers change model behavior or protocol compatibility.
 - GitHub Release assets are not a Maven repository; adopters must build and install the tag locally
   or manage downloaded jars and their transitive dependencies explicitly.
+- The Embeddings API currently targets OpenAI-compatible wire behavior; provider presets still need
+  model-specific live evidence before compatibility claims are promoted.
+- The RAG example uses an in-memory index and startup embedding call; production applications still
+  own durable storage, document ingestion, chunking, index refresh, and availability strategy.
 - If the project stays at the low-level client layer, users may choose official SDKs or handwritten
   HTTP clients instead.
 - The first Spring Boot workflow example now shows an HTTP controller boundary, but it still does not
@@ -109,10 +120,10 @@ It was initially tracked in M3 and was later retained as optional compatibility 
 
 ## Next Candidates
 
-1. Continue live-provider verification as optional, model-specific compatibility evidence without
-   committing credentials or provider payloads.
-2. Start the next snapshot development line after the `v0.2.0` release is published.
-3. Prioritize deeper Spring Boot integration and testing support using the released Java 17 baseline.
+1. Complete deterministic M4 verification and prepare the `v0.3.0` GitHub Release.
+2. Record optional model-specific Embeddings compatibility evidence without credentials or vectors.
+3. Evaluate durable vector-store integration only after real application feedback identifies a
+   stable abstraction boundary.
 
 ## Long-Term Goal Review
 
