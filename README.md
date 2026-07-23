@@ -119,9 +119,10 @@ clients, Anthropic Claude Messages chat support, streaming, tool-calling plumbin
 hints, safe lifecycle events, optional Micrometer metrics, optional OpenTelemetry tracing, redacted
 payload diagnostics, Spring Boot auto-configuration, provider presets, and in-memory testing support.
 
-The SDK targets Java 17 bytecode and verifies the full build on both Java 17 and Java 25. This keeps
-the minimum runtime aligned with established Spring backend environments while continuously checking
-compatibility with a current JDK.
+The SDK targets Java 17 bytecode and verifies the full build on both Java 17 and Java 25. The default
+build uses Spring Boot 4, while a dedicated compatibility profile verifies the starter and both
+compiled Spring examples against Spring Boot 3.5. This keeps the minimum runtime aligned with
+established Spring backend environments while continuously checking compatibility with a current JDK.
 
 OpenAI-compatible APIs remain the default provider path. Anthropic support is implemented as a focused
 internal adapter for Claude Messages API chat calls; it intentionally does not pretend that Claude
@@ -149,6 +150,16 @@ Validate the project locally with:
 ```shell
 mvn verify
 ```
+
+Run the same full-reactor verification against Spring Boot 3.5 with:
+
+```shell
+mvn -Pspring-boot-3 verify
+```
+
+The compatibility profile currently pins Spring Boot 3.5.16 and its matching Spring Framework
+6.2.19 line. This is evidence for the maintained 3.5 line, not a claim that every earlier Spring
+Boot 3.x release has been verified.
 
 `mvn verify` also compiles the example sources under `core/src/examples/java` so public usage snippets
 stay aligned with the current API without being packaged into the runtime jar.

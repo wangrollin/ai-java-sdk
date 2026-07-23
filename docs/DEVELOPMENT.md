@@ -17,6 +17,16 @@ mvn verify
 
 `mvn verify` also compiles examples under `core/src/examples/java`, so public usage snippets stay aligned with the current API.
 
+Run the full reactor against the maintained Spring Boot 3.5 compatibility line with:
+
+```shell
+mvn -Pspring-boot-3 verify
+```
+
+The profile keeps the Spring Boot and Spring Framework versions aligned for the starter and both
+Spring examples. CI runs this compatibility path on Java 17 in addition to the default Spring Boot 4
+build on Java 17 and Java 25.
+
 For documentation-only changes, at minimum inspect the changed Markdown files and confirm the working tree contains only the intended edits. Run `mvn verify` when the documentation change affects commands, examples, public API descriptions, or release guidance.
 
 ## AI Coding Workflow

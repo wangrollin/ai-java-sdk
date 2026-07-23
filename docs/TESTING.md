@@ -131,5 +131,14 @@ Run the complete project verification with:
 mvn verify
 ```
 
+Run the same tests and compiled examples against Spring Boot 3.5 with:
+
+```shell
+mvn -Pspring-boot-3 verify
+```
+
+This profile verifies Spring Boot 3.5.16 with Spring Framework 6.2.19. The default build remains on
+Spring Boot 4, and CI runs both dependency lines.
+
 Some core transport tests bind an in-process HTTP server to an ephemeral local port. Restricted
 sandboxes may require permission for that local bind even though no external AI provider is called.

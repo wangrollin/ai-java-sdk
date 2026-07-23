@@ -69,6 +69,8 @@
         <maven-surefire-plugin.version>3.5.6</maven-surefire-plugin.version>
         <spring-boot.version>4.0.5</spring-boot.version>
         <spring-framework.version>7.0.6</spring-framework.version>
+        <spring-boot-3.version>3.5.16</spring-boot-3.version>
+        <spring-framework-6.version>6.2.19</spring-framework-6.version>
         <assertj.version>3.27.7</assertj.version>
     </properties>
 
@@ -168,4 +170,20 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <!--
+          Keep Spring Boot 4 as the default development line while providing a stable,
+          reproducible command for verifying the maintained Spring Boot 3.5 line. Both
+          framework properties must move together because the example modules declare
+          Spring Framework dependencies directly.
+        -->
+        <profile>
+            <id>spring-boot-3</id>
+            <properties>
+                <spring-boot.version>${spring-boot-3.version}</spring-boot.version>
+                <spring-framework.version>${spring-framework-6.version}</spring-framework.version>
+            </properties>
+        </profile>
+    </profiles>
 </project>

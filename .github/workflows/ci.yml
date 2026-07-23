@@ -38,3 +38,24 @@ jobs:
       - name: Verify Maven project
         # verify runs the unit tests and confirms the distributable jars can be built.
         run: mvn -B verify
+
+  spring-boot-3-compatibility:
+    name: Spring Boot 3.5 Compatibility (Java 17)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: maven
+
+      - name: Verify Spring Boot 3.5 compatibility
+        # The profile switches Boot and Framework together so the starter and both
+        # compiled Spring examples are checked against one coherent dependency line.
+        run: mvn -B -Pspring-boot-3 verify

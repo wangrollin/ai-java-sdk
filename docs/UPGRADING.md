@@ -66,13 +66,14 @@ the OpenAI Responses API, so `AiResponseClient` calls fail fast for that provide
 | Application need | Dependency | Notes |
 | --- | --- | --- |
 | Core chat, Responses API, telemetry hooks, and test fake | `ai-java-sdk` | Add directly for framework-neutral applications. |
-| Spring Boot configuration and dependency injection | `ai-java-sdk-spring-boot-starter` | Includes core transitively; currently verified with Spring Boot 4. |
+| Spring Boot configuration and dependency injection | `ai-java-sdk-spring-boot-starter` | Includes core transitively; verified with Spring Boot 4 and Spring Boot 3.5. |
 | Micrometer metrics | `ai-java-sdk-micrometer` | Add beside core or the starter; use the same SDK version. |
 | OpenTelemetry tracing | `ai-java-sdk-opentelemetry` | Add beside core or the starter; use the same SDK version. |
 
-The `examples/support-ticket-triage` module is a source example, not an application dependency.
-Spring Boot 3 compatibility is not currently part of the verified matrix and should not be assumed
-until it has dedicated build and test evidence.
+The example modules are source examples, not application dependencies. The complete reactor,
+including the starter, support-ticket triage example, and knowledge-base RAG example, is verified
+with the default Spring Boot 4 line and with Spring Boot 3.5.16 plus Spring Framework 6.2.19. Earlier
+Spring Boot 3.x lines are not part of the current compatibility claim.
 
 ## Verification Checklist
 

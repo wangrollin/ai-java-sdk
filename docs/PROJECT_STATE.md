@@ -44,6 +44,10 @@ It was initially tracked in M3 and was later retained as optional compatibility 
 
 ## Recent Progress
 
+- 2026-07-23: Added a full-reactor Spring Boot 3.5 compatibility profile and dedicated Java 17 CI
+  verification. The starter, support-ticket triage example, and knowledge-base RAG example pass with
+  Spring Boot 3.5.16 and Spring Framework 6.2.19 without changing the Java public API; Spring Boot 4
+  remains the default dependency line.
 - 2026-07-17: Started M4 on `0.3.0-SNAPSHOT` with a typed OpenAI-compatible Embeddings API, batch
   requests, ordered vector results, usage metadata, safe vector redaction, fake-client fixtures,
   Spring Boot injection, and an optional live compatibility capability. Added a compiled in-memory

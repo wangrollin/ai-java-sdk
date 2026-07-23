@@ -19,6 +19,8 @@ work on `main` uses the next `-SNAPSHOT` version until a release is prepared and
 - Development on `main` now uses `0.3.0-SNAPSHOT` after the `v0.2.0` release.
 - Default payload diagnostics redact embedding vectors in addition to prompts, model output, tool
   arguments, and credentials.
+- The full reactor now has a dedicated Spring Boot 3.5 compatibility profile and CI path alongside
+  the default Spring Boot 4 build.
 
 ## [0.2.0] - 2026-07-17
 
