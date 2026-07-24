@@ -280,3 +280,26 @@ Implications:
 - The RAG example owns synthetic documents, cosine retrieval, and prompt assembly, demonstrating the
   workflow without presenting the in-memory implementation as production infrastructure.
 - M4 remains on GitHub Release distribution; Maven Central is deferred rather than made a feature gate.
+
+## 2026-07-24 - Support a Separate Default Embedding Model
+
+Decision: Allow `AiClient` and the Spring Boot starter to configure a default Embedding model that
+is independent from the generation default. When it is omitted, Embedding requests fall back to the
+existing default model.
+
+Context:
+
+- Generation and Embedding APIs normally use different provider models, so repeating a model on
+  every Embedding request pushes deployment configuration into application workflow code.
+- A second client would duplicate endpoint, authentication, retry, timeout, and observability
+  configuration when both model families use the same provider account.
+- Existing applications rely on `defaultModel` for all model-backed operations and must remain
+  source- and behavior-compatible.
+
+Implications:
+
+- Model precedence is request-level model, dedicated Embedding default, then generation default.
+- Spring Boot exposes optional `ai.sdk.embedding-model`; a configured blank value fails fast, while
+  an omitted value falls back to `ai.sdk.model`.
+- Provider, base URL, API key, timeout, retry, and telemetry remain shared by one client. Separate
+  provider accounts or endpoints still require separate client instances.

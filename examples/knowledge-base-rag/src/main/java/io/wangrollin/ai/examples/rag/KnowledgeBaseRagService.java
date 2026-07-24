@@ -49,7 +49,6 @@ public class KnowledgeBaseRagService {
     @PostConstruct
     void initializeIndex() {
         EmbeddingResult result = embeddingClient.embed(EmbeddingRequest.builder()
-                .model(properties.getEmbeddingModel())
                 .inputs(documents.stream().map(KnowledgeDocument::content).toList())
                 .build());
         if (result.embeddings().size() != documents.size()) {
@@ -70,7 +69,6 @@ public class KnowledgeBaseRagService {
             throw new IllegalArgumentException("question must not be blank");
         }
         EmbeddingResult queryResult = embeddingClient.embed(EmbeddingRequest.builder()
-                .model(properties.getEmbeddingModel())
                 .input(question)
                 .build());
         List<Double> queryVector = queryResult.embeddings().get(0).vector();
@@ -82,7 +80,6 @@ public class KnowledgeBaseRagService {
                 .toList();
 
         String answer = chatClient.chat(ChatRequest.builder()
-                .model(properties.getChatModel())
                 .message(ChatMessage.system(SYSTEM_PROMPT))
                 .message(ChatMessage.user(userPrompt(question, selected)))
                 .temperature(0.1)

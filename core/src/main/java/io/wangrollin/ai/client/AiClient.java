@@ -55,6 +55,7 @@ public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddi
     private final String apiKey;
     private final URI baseUri;
     private final String defaultModel;
+    private final String defaultEmbeddingModel;
     private final Duration timeout;
     private final AiProviderAdapter providerAdapter;
     private final AiHttpExecutor httpExecutor;
@@ -64,6 +65,9 @@ public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddi
         AiProviderPreset providerPreset = builder.providerPreset == null ? AiProviderPreset.OPENAI : builder.providerPreset;
         this.baseUri = normalizeBaseUri(builder.baseUrl);
         this.defaultModel = requireText(builder.defaultModel, "defaultModel");
+        this.defaultEmbeddingModel = builder.defaultEmbeddingModel == null
+                ? this.defaultModel
+                : requireText(builder.defaultEmbeddingModel, "defaultEmbeddingModel");
         this.timeout = builder.timeout == null ? DEFAULT_TIMEOUT : builder.timeout;
         if (this.timeout.isZero() || this.timeout.isNegative()) {
             throw new IllegalArgumentException("timeout must be positive");
@@ -101,7 +105,7 @@ public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddi
     @Override
     public EmbeddingResult embed(EmbeddingRequest request) {
         Objects.requireNonNull(request, "request must not be null");
-        ProviderRequestSpec providerRequest = providerAdapter.embeddingRequest(request, defaultModel);
+        ProviderRequestSpec providerRequest = providerAdapter.embeddingRequest(request, defaultEmbeddingModel);
         HttpRequest httpRequest = providerHttpRequestBuilder(providerRequest)
                 .timeout(timeout)
                 .header("Content-Type", "application/json")
@@ -521,6 +525,7 @@ public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddi
         private String apiKey;
         private String baseUrl;
         private String defaultModel;
+        private String defaultEmbeddingModel;
         private Duration timeout;
         private RetryPolicy retryPolicy;
         private AiEventListener eventListener;
@@ -563,6 +568,21 @@ public final class AiClient implements AiChatClient, AiResponseClient, AiEmbeddi
          */
         public Builder defaultModel(String defaultModel) {
             this.defaultModel = defaultModel;
+            return this;
+        }
+
+        /**
+         * Sets the model used when an embedding request does not provide its own model.
+         *
+         * <p>When this setting is omitted, embeddings continue to use
+         * {@link #defaultModel(String)} for backward compatibility. A request-level
+         * model remains the highest-precedence choice.
+         *
+         * @param defaultEmbeddingModel provider embedding model name
+         * @return this builder
+         */
+        public Builder defaultEmbeddingModel(String defaultEmbeddingModel) {
+            this.defaultEmbeddingModel = defaultEmbeddingModel;
             return this;
         }
 

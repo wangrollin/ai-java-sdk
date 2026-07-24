@@ -44,6 +44,7 @@ public class AiSdkAutoConfiguration {
                 .apiKey(properties.requireApiKey())
                 .baseUrl(properties.requireBaseUrl())
                 .defaultModel(properties.requireModel())
+                .defaultEmbeddingModel(properties.embeddingModelOrDefault())
                 .providerPreset(properties.requireProviderPreset())
                 .provider(properties.requireProvider())
                 .timeout(properties.requireTimeout())

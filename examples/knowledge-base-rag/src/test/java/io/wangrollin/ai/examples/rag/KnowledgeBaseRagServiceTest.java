@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -31,10 +32,10 @@ class KnowledgeBaseRagServiceTest {
         assertEquals(List.of("retries", "telemetry"), answer.sourceIds());
         assertEquals(2, client.embeddingRequests().size());
         assertEquals(3, client.embeddingRequests().get(0).inputs().size());
-        assertEquals("text-embedding-test", client.embeddingRequests().get(0).model());
+        assertNull(client.embeddingRequests().get(0).model());
         String prompt = client.requests().get(0).messages().get(1).content();
         assertTrue(prompt.indexOf("[source:retries]") < prompt.indexOf("[source:telemetry]"));
-        assertEquals("chat-test", client.requests().get(0).model());
+        assertNull(client.requests().get(0).model());
     }
 
     @Test
@@ -67,8 +68,6 @@ class KnowledgeBaseRagServiceTest {
 
     private static KnowledgeBaseRagService serviceUsing(FakeAiClient client) {
         RagProperties properties = new RagProperties();
-        properties.setEmbeddingModel("text-embedding-test");
-        properties.setChatModel("chat-test");
         properties.setTopK(2);
         return new KnowledgeBaseRagService(client, client, properties, new SyntheticKnowledgeBase());
     }

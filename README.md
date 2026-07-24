@@ -72,8 +72,8 @@ the service and controller with `FakeAiClient` instead of API keys or sockets.
 
 For retrieval-augmented generation, `examples/knowledge-base-rag` embeds a synthetic corpus in one
 batch, performs in-memory cosine retrieval, and sends selected context through `AiChatClient`. It
-demonstrates separate request-level embedding and chat models while leaving durable vector storage,
-ingestion, and chunking to the application.
+demonstrates separate client-level embedding and generation defaults while leaving durable vector
+storage, ingestion, and chunking to the application.
 
 ## Backend Adoption Quick Path
 
@@ -210,6 +210,7 @@ AiClient client = AiClient.builder()
     .provider(AiProvider.OPENAI_COMPATIBLE)
     .baseUrl(System.getenv("OPENAI_BASE_URL"))
     .defaultModel("gpt-4.1-mini")
+    .defaultEmbeddingModel("text-embedding-3-small")
     .timeout(Duration.ofSeconds(30))
     .retryPolicy(RetryPolicy.defaultPolicy())
     .build();
@@ -222,13 +223,13 @@ System.out.println(response.text());
 ```
 
 OpenAI-compatible embedding models are available through `AiEmbeddingClient`. Batch input returns
-vectors ordered by provider input index, and the request can select a model independently from the
-client's default generation model.
+vectors ordered by provider input index. Configure a separate embedding default on the client when
+generation and embedding calls use different models. A request-level model still takes precedence,
+and clients without a separate embedding default retain the existing `defaultModel` behavior.
 
 ```java
 AiEmbeddingClient embeddings = client;
 EmbeddingResult result = embeddings.embed(EmbeddingRequest.builder()
-    .model("text-embedding-3-small")
     .inputs(List.of("first synthetic document", "second synthetic document"))
     .dimensions(256)
     .build());
@@ -684,6 +685,7 @@ Do not commit real API keys to source control.
 ```properties
 ai.sdk.api-key=${OPENAI_API_KEY}
 ai.sdk.model=gpt-4.1-mini
+ai.sdk.embedding-model=text-embedding-3-small
 ai.sdk.provider=openai-compatible
 ai.sdk.provider-preset=openai
 ai.sdk.base-url=${OPENAI_BASE_URL}
@@ -696,7 +698,8 @@ ai.sdk.retry.status-codes=429,500,502,503,504
 ```
 
 The starter creates one `AiClient` bean when the application has not already defined an
-`AiClient`, `AiChatClient`, or `AiResponseClient`. Since `AiClient` implements both interfaces,
+`AiClient`, `AiChatClient`, `AiResponseClient`, or `AiEmbeddingClient`. Since `AiClient` implements
+all three narrow interfaces,
 application services can depend on the narrow contract they need:
 
 ```java

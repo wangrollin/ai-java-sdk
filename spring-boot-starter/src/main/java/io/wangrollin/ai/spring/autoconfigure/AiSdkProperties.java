@@ -29,6 +29,12 @@ public class AiSdkProperties {
     private String model;
 
     /**
+     * Default embedding model. When omitted, embedding requests use {@link #model}
+     * so existing starter configurations remain compatible.
+     */
+    private String embeddingModel;
+
+    /**
      * Provider base URL supplied by application configuration.
      */
     private String baseUrl;
@@ -67,6 +73,14 @@ public class AiSdkProperties {
 
     public void setModel(String model) {
         this.model = model;
+    }
+
+    public String getEmbeddingModel() {
+        return embeddingModel;
+    }
+
+    public void setEmbeddingModel(String embeddingModel) {
+        this.embeddingModel = embeddingModel;
     }
 
     public String getBaseUrl() {
@@ -115,6 +129,13 @@ public class AiSdkProperties {
 
     String requireModel() {
         return requireText(model, "ai.sdk.model");
+    }
+
+    String embeddingModelOrDefault() {
+        if (embeddingModel == null) {
+            return requireModel();
+        }
+        return requireText(embeddingModel, "ai.sdk.embedding-model");
     }
 
     String requireBaseUrl() {

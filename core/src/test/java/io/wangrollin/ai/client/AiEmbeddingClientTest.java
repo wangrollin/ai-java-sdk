@@ -75,6 +75,55 @@ class AiEmbeddingClientTest {
     }
 
     @Test
+    void usesDedicatedDefaultEmbeddingModel() throws Exception {
+        AtomicReference<String> body = new AtomicReference<>();
+        startServer(exchange -> {
+            body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            respond(exchange, 200, """
+                    {"data":[{"index":0,"embedding":[0.1,0.2]}]}
+                    """);
+        });
+
+        testClient(null, "embedding-model").embed(EmbeddingRequest.builder()
+                .input("alpha")
+                .build());
+
+        JsonNode request = OBJECT_MAPPER.readTree(body.get());
+        assertEquals("embedding-model", request.path("model").asText());
+    }
+
+    @Test
+    void requestModelOverridesDedicatedDefaultEmbeddingModel() throws Exception {
+        AtomicReference<String> body = new AtomicReference<>();
+        startServer(exchange -> {
+            body.set(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            respond(exchange, 200, """
+                    {"data":[{"index":0,"embedding":[0.1,0.2]}]}
+                    """);
+        });
+
+        testClient(null, "embedding-model").embed(EmbeddingRequest.builder()
+                .model("request-model")
+                .input("alpha")
+                .build());
+
+        JsonNode request = OBJECT_MAPPER.readTree(body.get());
+        assertEquals("request-model", request.path("model").asText());
+    }
+
+    @Test
+    void rejectsBlankDedicatedDefaultEmbeddingModel() {
+        IllegalArgumentException failure = assertThrows(IllegalArgumentException.class, () -> AiClient.builder()
+                .apiKey("test-key")
+                .baseUrl("http://localhost")
+                .defaultModel("test-model")
+                .defaultEmbeddingModel(" ")
+                .build());
+
+        assertTrue(failure.getMessage().contains("defaultEmbeddingModel"));
+    }
+
+    @Test
     void reportsProviderErrors() throws Exception {
         startServer(exchange -> respond(exchange, 429, """
                 {"error":{"message":"rate limited"}}
@@ -161,11 +210,18 @@ class AiEmbeddingClientTest {
     }
 
     private AiClient testClient(AiPayloadDiagnosticsListener diagnostics) {
+        return testClient(diagnostics, null);
+    }
+
+    private AiClient testClient(AiPayloadDiagnosticsListener diagnostics, String defaultEmbeddingModel) {
         AiClient.Builder builder = AiClient.builder()
                 .apiKey("test-key")
                 .baseUrl(baseUrl())
                 .defaultModel("test-model")
                 .timeout(Duration.ofSeconds(5));
+        if (defaultEmbeddingModel != null) {
+            builder.defaultEmbeddingModel(defaultEmbeddingModel);
+        }
         if (diagnostics != null) {
             builder.payloadDiagnosticsListener(diagnostics);
         }

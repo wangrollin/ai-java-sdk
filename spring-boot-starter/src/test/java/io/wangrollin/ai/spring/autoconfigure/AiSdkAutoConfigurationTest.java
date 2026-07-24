@@ -28,6 +28,7 @@ import java.net.InetSocketAddress;
 import java.net.http.HttpClient;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
@@ -80,6 +81,53 @@ class AiSdkAutoConfigurationTest {
                             .embed(EmbeddingRequest.builder().input("document").build())
                             .embeddings().size());
                 });
+    }
+
+    @Test
+    void appliesDedicatedEmbeddingModelWithoutChangingChatDefault() throws Exception {
+        AtomicReference<String> chatBody = new AtomicReference<>();
+        AtomicReference<String> embeddingBody = new AtomicReference<>();
+        startServer(exchange -> {
+            String body = new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8);
+            if ("/embeddings".equals(exchange.getRequestURI().getPath())) {
+                embeddingBody.set(body);
+                respond(exchange, 200, """
+                        {"data":[{"index":0,"embedding":[0.1,0.2]}]}
+                        """);
+                return;
+            }
+            chatBody.set(body);
+            respond(exchange, 200, """
+                    {"choices":[{"message":{"content":"ok"}}]}
+                    """);
+        });
+
+        contextRunner
+                .withPropertyValues(requiredProperties())
+                .withPropertyValues("ai.sdk.embedding-model=embedding-test")
+                .run(context -> {
+                    context.getBean(AiChatClient.class).chat(ChatRequest.builder()
+                            .message(ChatMessage.user("Hello"))
+                            .build());
+                    context.getBean(AiEmbeddingClient.class).embed(EmbeddingRequest.builder()
+                            .input("document")
+                            .build());
+
+                    assertTrue(chatBody.get().contains("\"model\":\"test-model\""));
+                    assertTrue(embeddingBody.get().contains("\"model\":\"embedding-test\""));
+                });
+    }
+
+    @Test
+    void failsFastWhenEmbeddingModelIsBlank() {
+        contextRunner
+                .withPropertyValues(
+                        "ai.sdk.api-key=test-key",
+                        "ai.sdk.base-url=http://localhost",
+                        "ai.sdk.model=test-model",
+                        "ai.sdk.embedding-model=")
+                .run(context -> assertTrue(hasCauseMessage(
+                        context.getStartupFailure(), "ai.sdk.embedding-model must be configured")));
     }
 
     @Test

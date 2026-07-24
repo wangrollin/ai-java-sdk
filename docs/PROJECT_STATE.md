@@ -44,6 +44,10 @@ It was initially tracked in M3 and was later retained as optional compatibility 
 
 ## Recent Progress
 
+- 2026-07-24: Added a dedicated default Embedding model to the core builder and Spring Boot
+  configuration. Request-level model overrides remain highest precedence, while configurations that
+  omit the new setting continue to use the generation default. The RAG example now demonstrates
+  client-level model selection instead of repeating model overrides in application code.
 - 2026-07-23: Added a full-reactor Spring Boot 3.5 compatibility profile and dedicated Java 17 CI
   verification. The starter, support-ticket triage example, and knowledge-base RAG example pass with
   Spring Boot 3.5.16 and Spring Framework 6.2.19 without changing the Java public API; Spring Boot 4
@@ -51,7 +55,7 @@ It was initially tracked in M3 and was later retained as optional compatibility 
 - 2026-07-17: Started M4 on `0.3.0-SNAPSHOT` with a typed OpenAI-compatible Embeddings API, batch
   requests, ordered vector results, usage metadata, safe vector redaction, fake-client fixtures,
   Spring Boot injection, and an optional live compatibility capability. Added a compiled in-memory
-  RAG example using a synthetic corpus, cosine retrieval, request-level embedding/chat models, and
+  RAG example using a synthetic corpus, cosine retrieval, separate embedding/chat models, and
   deterministic tests without a vector-store abstraction. Full `mvn verify` passed across all seven
   reactor modules; the remaining M4 step is explicit `v0.3.0` release preparation and publication.
 - 2026-07-17: Prepared stable `0.2.0` coordinates and GitHub Release documentation for the four
